@@ -1,0 +1,24 @@
+services:
+  scene-map:
+    image: "${SCENE_MAP_IMAGE:-ghcr.io/swilcox/kdrama-graph:latest}"
+    pull_policy: always
+    ports:
+      - "${SCENE_MAP_PORT:-8787}:8787"
+    environment:
+      NODE_ENV: production
+      PORT: 8787
+      DB_PATH: /app/data/scene-map.db
+      TZ: "${TZ:-America/Chicago}"
+    volumes:
+      - "${SCENE_MAP_DATA_DIR:-./data}:/app/data"
+      - "${SCENE_MAP_BACKUP_DIR:-./backups}:/app/backups"
+    restart: unless-stopped
+    init: true
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    stop_grace_period: 20s

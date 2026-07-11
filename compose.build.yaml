@@ -1,0 +1,10 @@
+services:
+  scene-map:
+    image: scene-map:local
+    pull_policy: build
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        VERSION: dev
+        REVISION: local

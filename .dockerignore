@@ -1,0 +1,12 @@
+.git
+.gitignore
+.DS_Store
+node_modules
+.pnpm-store
+dist
+data
+backups
+*.log
+.env
+.env.*
+!.env.example
