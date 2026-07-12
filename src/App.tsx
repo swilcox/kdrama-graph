@@ -3,12 +3,11 @@ import { BarChart3, Clapperboard, Download, ExternalLink, Film, Grid3X3, LayoutD
 import { api } from './api'
 import { Artwork } from './components/Artwork'
 import { PersonForm } from './components/PersonForm'
-import { RelationshipGraph } from './components/RelationshipGraph'
 import { TitleForm } from './components/TitleForm'
 import { ImportAsianWiki } from './components/ImportAsianWiki'
 import type { Person, PersonDraft, Snapshot, Title, TitleDraft, WatchStatus } from './types'
 
-type View = 'dashboard' | 'library' | 'graph' | 'people'
+type View = 'dashboard' | 'library' | 'people'
 
 export default function App() {
   const [data, setData] = useState<Snapshot>({ titles: [], people: [], credits: [] })
@@ -51,16 +50,14 @@ export default function App() {
       <nav>
         <NavButton icon={<LayoutDashboard />} label="Overview" active={view === 'dashboard'} onClick={() => setView('dashboard')} />
         <NavButton icon={<Grid3X3 />} label="Library" active={view === 'library'} onClick={() => setView('library')} count={data.titles.length} />
-        <NavButton icon={<Network />} label="Graph" active={view === 'graph'} onClick={() => setView('graph')} />
         <NavButton icon={<UsersRound />} label="People" active={view === 'people'} onClick={() => setView('people')} count={data.people.length} />
       </nav>
-      <div className="sidebar-foot"><div className="legend-item"><i className="title-dot" />Titles</div><div className="legend-item"><i className="person-dot" />People</div></div>
     </aside>
 
     <main>
       <header className="topbar">
         <div className="mobile-brand"><Clapperboard /><strong>Scene Map</strong></div>
-        <div className="search"><Search /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={view === 'people' ? 'Search people' : view === 'graph' ? 'Focus the graph' : 'Search your library'} /></div>
+        <div className="search"><Search /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={view === 'people' ? 'Search people' : 'Search your library'} /></div>
         <div className="topbar-actions"><button className="button secondary import-button" onClick={() => setImporting(true)}><Download />Import</button><button className="button primary" onClick={() => view === 'people' ? setEditingPerson(null) : setEditingTitle(null)}><Plus />{view === 'people' ? 'Add person' : 'Add title'}</button></div>
       </header>
 
@@ -68,7 +65,6 @@ export default function App() {
       {loading ? <div className="loading"><Clapperboard /><span>Opening your library...</span></div> : <>
         {view === 'dashboard' && <Dashboard data={data} openTitle={setEditingTitle} goTo={setView} />}
         {view === 'library' && <Library titles={filteredTitles} status={status} setStatus={setStatus} openTitle={setEditingTitle} />}
-        {view === 'graph' && <section className="graph-view"><PageTitle eyebrow="Relationship explorer" title="Your watch graph" aside={`${data.credits.length} connections`} /><div className="graph-legend"><span><i className="title-dot" />Title</span><span><i className="person-dot" />Person</span><span><i className="lead-line" />Lead role</span><p>Click any node to open its details.</p></div><RelationshipGraph titles={data.titles} people={data.people} credits={data.credits} focus={query} onSelect={(kind, id) => kind === 'title' ? setEditingTitle(data.titles.find((t) => t.id === id)) : setEditingPerson(data.people.find((p) => p.id === id))} /></section>}
         {view === 'people' && <People people={filteredPeople} credits={data.credits} titles={data.titles} openPerson={setEditingPerson} />}
       </>}
     </main>
@@ -101,9 +97,9 @@ function Dashboard({ data, openTitle, goTo }: { data: Snapshot; openTitle: (titl
       <section className="work-section wide"><SectionHeader title="Continue watching" action="View library" onClick={() => goTo('library')} />
         <div className="continue-list">{watching.map((title) => <button key={title.id} onClick={() => openTitle(title)} className="continue-item"><Artwork src={title.posterUrl} name={title.name} /><div className="continue-main"><span className="type-label">{title.type} · {title.year}</span><strong>{title.name}</strong><div className="progress-track"><i style={{ width: `${title.episodesTotal ? Math.min(100, title.episodesWatched / title.episodesTotal * 100) : 0}%` }} /></div><small>Episode {title.episodesWatched} of {title.episodesTotal ?? '?'}</small></div><span className="rating">{title.rating ? <><Star />{title.rating}</> : 'Not rated'}</span></button>)}{!watching.length && <Empty title="Nothing in progress" copy="Move a title to Watching to track episode progress." />}</div>
       </section>
-      <section className="work-section"><SectionHeader title="Most connected" action="Open graph" onClick={() => goTo('graph')} /><div className="connected-list">{connected.map((person, index) => <div key={person.id}><span className="rank">0{index + 1}</span><Artwork kind="person" src={person.photoUrl} name={person.name} /><div><strong>{person.name}</strong><small>{person.titleCount} linked {person.titleCount === 1 ? 'title' : 'titles'}</small></div><div className="connection-bars">{Array.from({ length: Math.max(1, person.titleCount) }).map((_, i) => <i key={i} />)}</div></div>)}</div></section>
+      <section className="work-section"><SectionHeader title="Most connected" action="View people" onClick={() => goTo('people')} /><div className="connected-list">{connected.map((person, index) => <div key={person.id}><span className="rank">0{index + 1}</span><Artwork kind="person" src={person.photoUrl} name={person.name} /><div><strong>{person.name}</strong><small>{person.titleCount} linked {person.titleCount === 1 ? 'title' : 'titles'}</small></div><div className="connection-bars">{Array.from({ length: Math.max(1, person.titleCount) }).map((_, i) => <i key={i} />)}</div></div>)}</div></section>
       <section className="work-section wide"><SectionHeader title="Recently completed" action={`${completed.length} total`} /><div className="poster-strip">{completed.slice(0, 6).map((title) => <button key={title.id} onClick={() => openTitle(title)}><Artwork src={title.posterUrl} name={title.name} /><span><strong>{title.name}</strong><small>{title.year} · {title.rating ? `${title.rating}/10` : 'Unrated'}</small></span></button>)}</div></section>
-      <section className="insight-panel"><BarChart3 /><p>Actors in your library have appeared across <strong>{new Set(data.credits.map((c) => c.titleId)).size}</strong> connected titles.</p><button onClick={() => goTo('graph')}>Explore connections</button></section>
+      <section className="insight-panel"><BarChart3 /><p>Actors in your library have appeared across <strong>{new Set(data.credits.map((c) => c.titleId)).size}</strong> connected titles.</p><button onClick={() => goTo('people')}>Browse people</button></section>
     </div>
   </div>
 }
@@ -114,7 +110,26 @@ function Library({ titles, status, setStatus, openTitle }: { titles: Title[]; st
 }
 
 function People({ people, credits, titles, openPerson }: { people: Person[]; credits: Snapshot['credits']; titles: Title[]; openPerson: (p: Person) => void }) {
-  return <div className="page"><PageTitle eyebrow="Cast index" title="People" aside={`${people.length} people`} /><div className="people-grid">{people.map((person) => { const links = credits.filter((c) => c.personId === person.id); return <button className="person-card" key={person.id} onClick={() => openPerson(person)}><Artwork kind="person" src={person.photoUrl} name={person.name} /><div className="person-info"><div><strong>{person.name}</strong><span>{person.titleCount} linked {person.titleCount === 1 ? 'title' : 'titles'}</span></div><div className="person-titles">{links.slice(0, 3).map((credit) => { const title = titles.find((t) => t.id === credit.titleId); return <Artwork key={credit.id} src={title?.posterUrl} name={credit.titleName} /> })}</div></div></button>})}</div></div>
+  const [sort, setSort] = useState<'name' | 'connections'>('name')
+  const sortedPeople = useMemo(() => [...people].sort((a, b) => sort === 'connections'
+    ? b.titleCount - a.titleCount || a.name.localeCompare(b.name)
+    : a.name.localeCompare(b.name)), [people, sort])
+  const creditsByPerson = useMemo(() => {
+    const byPerson = new Map<number, Snapshot['credits']>()
+    credits.forEach((credit) => {
+      const personCredits = byPerson.get(credit.personId)
+      if (personCredits) personCredits.push(credit)
+      else byPerson.set(credit.personId, [credit])
+    })
+    return byPerson
+  }, [credits])
+  const titlesById = useMemo(() => new Map(titles.map((title) => [title.id, title])), [titles])
+  return <div className="page"><PageTitle eyebrow="Cast index" title="People" aside={`${people.length} people`} />
+    <div className="filter-tabs" role="group" aria-label="Sort people">
+      <button className={sort === 'name' ? 'active' : ''} onClick={() => setSort('name')}>Name</button>
+      <button className={sort === 'connections' ? 'active' : ''} onClick={() => setSort('connections')}>Most connected</button>
+    </div>
+    <div className="people-grid">{sortedPeople.map((person) => { const links = creditsByPerson.get(person.id) || []; return <button className="person-card" key={person.id} onClick={() => openPerson(person)}><Artwork kind="person" src={person.photoUrl} name={person.name} /><div className="person-info"><div><strong>{person.name}</strong><span>{person.titleCount} linked {person.titleCount === 1 ? 'title' : 'titles'}</span></div><div className="person-titles">{links.slice(0, 3).map((credit) => <Artwork key={credit.id} src={titlesById.get(credit.titleId)?.posterUrl} name={credit.titleName} />)}</div></div></button>})}</div></div>
 }
 
 function PageTitle({ eyebrow, title, aside }: { eyebrow: string; title: string; aside?: string }) { return <div className="page-title"><div><p className="eyebrow">{eyebrow}</p><h1>{title}</h1></div>{aside && <span>{aside}</span>}</div> }
@@ -123,6 +138,6 @@ function SectionHeader({ title, action, onClick }: { title: string; action: stri
 function NavButton({ icon, label, active, onClick, count }: { icon: React.ReactNode; label: string; active: boolean; onClick: () => void; count?: number }) { return <button className={active ? 'active' : ''} onClick={onClick}>{icon}<span>{label}</span>{count !== undefined && <small>{count}</small>}</button> }
 function Status({ status }: { status: WatchStatus }) { return <span className={`status status-${status}`}>{titleCase(status)}</span> }
 function Empty({ title, copy }: { title: string; copy: string }) { return <div className="empty"><Clapperboard /><strong>{title}</strong><span>{copy}</span></div> }
-function MobileNav({ view, setView }: { view: View; setView: (v: View) => void }) { return <nav className="mobile-nav"><NavButton icon={<LayoutDashboard />} label="Overview" active={view === 'dashboard'} onClick={() => setView('dashboard')} /><NavButton icon={<Grid3X3 />} label="Library" active={view === 'library'} onClick={() => setView('library')} /><NavButton icon={<Network />} label="Graph" active={view === 'graph'} onClick={() => setView('graph')} /><NavButton icon={<UserRound />} label="People" active={view === 'people'} onClick={() => setView('people')} /></nav> }
+function MobileNav({ view, setView }: { view: View; setView: (v: View) => void }) { return <nav className="mobile-nav"><NavButton icon={<LayoutDashboard />} label="Overview" active={view === 'dashboard'} onClick={() => setView('dashboard')} /><NavButton icon={<Grid3X3 />} label="Library" active={view === 'library'} onClick={() => setView('library')} /><NavButton icon={<UserRound />} label="People" active={view === 'people'} onClick={() => setView('people')} /></nav> }
 const titleCase = (value: string) => value.charAt(0).toUpperCase() + value.slice(1)
 const message = (error: unknown) => error instanceof Error ? error.message : 'Something went wrong'

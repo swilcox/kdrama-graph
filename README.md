@@ -1,6 +1,6 @@
 # Scene Map
 
-A local-first K-drama and Korean film journal. Track watch status, episode progress, ratings, notes, cast credits, and source links, then browse the relationships between titles and people as an interactive graph.
+A local-first K-drama and Korean film journal. Track watch status, episode progress, ratings, notes, cast credits, and source links, then browse shared cast history across titles and people.
 
 [Releases](https://github.com/swilcox/kdrama-graph/releases) · [Container images](https://github.com/swilcox/kdrama-graph/pkgs/container/kdrama-graph)
 
@@ -30,7 +30,7 @@ pnpm test      # Run database tests
 
 SQLite data is stored in `data/scene-map.db`. This file is ignored by Git. Set `DB_PATH` to use a different location and `PORT` to change the API/production server port.
 
-The database starts with a small editable sample library to make the graph visible on first run. Poster and profile image URLs are presentation placeholders; replace them with images you have permission to use. AsianWiki links are stored as source references only. Deleting `data/scene-map.db` resets the local database to the starter data on the next launch.
+The database starts with a small editable sample library to demonstrate cast connections on first run. Poster and profile image URLs are presentation placeholders; replace them with images you have permission to use. AsianWiki links are stored as source references only. Deleting `data/scene-map.db` resets the local database to the starter data on the next launch.
 
 ## Production
 

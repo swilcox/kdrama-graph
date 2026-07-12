@@ -89,7 +89,7 @@ export function TitleForm({ title, titles, people, credits, onClose, onSave, onD
                   })}</div></div> : <p className="no-shared-titles">No other titles in your library yet</p>}
                 </div>
               })}
-              {!titleCredits.length && <p className="empty-copy">Connect cast members to make this title appear in the graph.</p>}
+              {!titleCredits.length && <p className="empty-copy">Connect cast members to build this title's cast history.</p>}
               {!!titleCredits.length && !visibleCredits.length && <div className="connection-empty"><Network /><strong>No shared history yet</strong><span>None of this cast appears in another title in your library.</span></div>}
             </div>
             {!!availablePeople.length && <div className="add-credit">
