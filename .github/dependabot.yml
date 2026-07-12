@@ -10,6 +10,7 @@ updates:
     groups:
       application-dependencies:
         patterns: ["*"]
+        update-types: [minor, patch]
 
   - package-ecosystem: github-actions
     directory: /
@@ -18,4 +19,7 @@ updates:
       day: monday
       time: "09:00"
       timezone: America/Chicago
-
+    groups:
+      github-actions:
+        patterns: ["*"]
+        update-types: [minor, patch]
