@@ -52,13 +52,24 @@ export function TitleForm({ title, titles, people, credits, onClose, onSave, onD
           <div className="form-grid">
             <div className="field"><label>Format</label><select value={draft.type} onChange={(e) => field('type', e.target.value as TitleDraft['type'])}><option value="series">Series</option><option value="movie">Movie</option></select></div>
             <div className="field"><label>Release year</label><input type="number" min="1900" max="2100" value={draft.year ?? ''} onChange={(e) => field('year', e.target.value ? Number(e.target.value) : null)} /></div>
-            <div className="field"><label>Status</label><select value={draft.status} onChange={(e) => field('status', e.target.value as WatchStatus)}>{statusOptions.map((status) => <option key={status} value={status}>{label(status)}</option>)}</select></div>
+            <div className="field"><label>Status</label><select value={draft.status} onChange={(e) => {
+              const status = e.target.value as WatchStatus
+              setDraft((current) => ({
+                ...current,
+                status,
+                episodesWatched: status === 'completed' && current.episodesTotal !== null
+                  ? current.episodesTotal
+                  : current.episodesWatched,
+              }))
+            }}>{statusOptions.map((status) => <option key={status} value={status}>{label(status)}</option>)}</select></div>
             <div className="field"><label>Rating / 10</label><input type="number" min="0" max="10" step="0.5" value={draft.rating ?? ''} onChange={(e) => field('rating', e.target.value ? Number(e.target.value) : null)} placeholder="Not rated" /></div>
             {draft.type === 'series' && <><div className="field"><label>Episodes watched</label><input type="number" min="0" value={draft.episodesWatched} onChange={(e) => field('episodesWatched', Number(e.target.value))} /></div><div className="field"><label>Total episodes</label><input type="number" min="1" value={draft.episodesTotal ?? ''} onChange={(e) => field('episodesTotal', e.target.value ? Number(e.target.value) : null)} /></div></>}
           </div>
           <div className="field"><label>Poster image URL</label><input type="url" value={draft.posterUrl} onChange={(e) => field('posterUrl', e.target.value)} placeholder="https://..." /></div>
           <div className="field"><label>AsianWiki URL</label><div className="input-action"><input type="url" value={draft.asianwikiUrl} onChange={(e) => field('asianwikiUrl', e.target.value)} placeholder="https://asianwiki.com/..." />{draft.asianwikiUrl && <a href={draft.asianwikiUrl} target="_blank" rel="noreferrer" aria-label="Open AsianWiki"><ExternalLink /></a>}</div></div>
           <div className="field"><label>Notes & review</label><textarea rows={5} value={draft.notes} onChange={(e) => field('notes', e.target.value)} placeholder="What worked, favorite moments, whether you'd rewatch..." /></div>
+
+          {title && <TitleActions className="drawer-actions drawer-actions-before-cast" onDelete={onDelete} saving={saving} />}
 
           {title && <section className="cast-editor connection-browser">
             <div className="section-heading connection-heading"><div><p className="eyebrow">Connections</p><h3>Cast history</h3></div><span>{connectedCastCount} of {titleCredits.length} connected elsewhere</span></div>
@@ -89,14 +100,22 @@ export function TitleForm({ title, titles, people, credits, onClose, onSave, onD
             </div>}
           </section>}
 
-          <footer className="drawer-actions">
-            {onDelete && <button type="button" className="button danger" onClick={onDelete}><Trash2 />Delete</button>}
-            <button className="button primary" disabled={saving}><Save />{saving ? 'Saving...' : 'Save title'}</button>
-          </footer>
+          <TitleActions className="drawer-actions" onDelete={onDelete} saving={saving} />
         </form>
       </aside>
     </div>
   )
+}
+
+function TitleActions({ className, onDelete, saving }: {
+  className: string
+  onDelete: (() => Promise<void>) | null
+  saving: boolean
+}) {
+  return <div className={className}>
+    {onDelete && <button type="button" className="button danger" onClick={onDelete}><Trash2 />Delete</button>}
+    <button type="submit" className="button primary" disabled={saving}><Save />{saving ? 'Saving...' : 'Save title'}</button>
+  </div>
 }
 
 const statusOptions: WatchStatus[] = ['watchlist', 'watching', 'completed', 'paused', 'dropped']
