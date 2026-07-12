@@ -13,7 +13,12 @@ const fixture = `
       <tr><td><a href="/Actor_One"><img src="/images/actor.jpg"></a></td></tr>
       <tr><td><a href="/Actor_One">Actor One</a></td></tr>
       <tr><td>Lead Character</td></tr>
-    </table><h2><span id="Comments">Comments</span></h2>
+    </table>
+    <p><b>Additional Cast Members:</b></p><ul>
+      <li><a href="/Actor_Two" title="Actor Two">Actor Two</a> - Detective Park</li>
+      <li><a href="/Actor_One" title="Actor One">Actor One</a> - duplicate listing</li>
+    </ul>
+    <h2><span id="Comments">Comments</span></h2>
   </div></body></html>`
 
 test('normalizes supported AsianWiki URLs and rejects other hosts', () => {
@@ -33,4 +38,9 @@ test('parses title metadata and cast tables', () => {
     name: 'Actor One', asianwikiUrl: 'https://asianwiki.com/Actor_One',
     photoUrl: 'https://asianwiki.com/images/actor.jpg', characterName: 'Lead Character', role: 'Lead', billingOrder: 0,
   })
+  assert.deepEqual(parsed.cast[1], {
+    name: 'Actor Two', asianwikiUrl: 'https://asianwiki.com/Actor_Two',
+    photoUrl: '', characterName: 'Detective Park', role: 'Supporting', billingOrder: 1,
+  })
+  assert.equal(parsed.cast.length, 2)
 })

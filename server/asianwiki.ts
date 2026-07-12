@@ -100,6 +100,25 @@ export function parseAsianWikiHtml(html: string, sourceUrl: string): AsianWikiPr
       })
     })
   })
+  castHeading.nextUntil('h2').filter('p').each((_, element) => {
+    if (!/^Additional Cast Members:/i.test(cleanText($(element).text()))) return
+    $(element).next('ul').find('li').each((_, item) => {
+      const link = $(item).find('a').filter((_, anchor) => isPersonPath($(anchor).attr('href'))).first()
+      const href = link.attr('href') || ''
+      const personName = cleanText(link.text())
+      if (!personName || cast.some((person) => person.asianwikiUrl === absolute(href))) return
+      const characterName = cleanText($(item).clone().find('a').first().remove().end().text())
+        .replace(/^[-–—]\s*/, '')
+      cast.push({
+        name: personName,
+        asianwikiUrl: absolute(href),
+        photoUrl: '',
+        characterName,
+        role: 'Supporting',
+        billingOrder: cast.length,
+      })
+    })
+  })
   if (!cast.length) throw new Error('No cast table was found on this AsianWiki page')
   return {
     sourceUrl, name, type, year: yearMatch ? Number(yearMatch[0]) : null,
