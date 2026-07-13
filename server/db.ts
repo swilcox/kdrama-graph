@@ -13,6 +13,7 @@ export type TitleInput = {
   posterUrl?: string
   asianwikiUrl?: string
   notes?: string
+  tags?: string[]
 }
 
 export type PersonInput = {
@@ -20,6 +21,7 @@ export type PersonInput = {
   photoUrl?: string
   asianwikiUrl?: string
   notes?: string
+  favorite?: boolean
 }
 
 const dbPath = process.env.DB_PATH || resolve('data/scene-map.db')
@@ -49,6 +51,7 @@ db.exec(`
     photo_url TEXT NOT NULL DEFAULT '',
     asianwiki_url TEXT NOT NULL DEFAULT '',
     notes TEXT NOT NULL DEFAULT '',
+    favorite INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
   );
   CREATE TABLE IF NOT EXISTS credits (
@@ -60,6 +63,23 @@ db.exec(`
     billing_order INTEGER NOT NULL DEFAULT 9999,
     UNIQUE(title_id, person_id)
   );
+  CREATE TABLE IF NOT EXISTS tags (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE COLLATE NOCASE
+  );
+  CREATE TABLE IF NOT EXISTS title_tags (
+    title_id INTEGER NOT NULL REFERENCES titles(id) ON DELETE CASCADE,
+    tag_id INTEGER NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
+    PRIMARY KEY(title_id, tag_id)
+  );
+  CREATE TABLE IF NOT EXISTS title_links (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    source_title_id INTEGER NOT NULL REFERENCES titles(id) ON DELETE CASCADE,
+    target_title_id INTEGER NOT NULL REFERENCES titles(id) ON DELETE CASCADE,
+    episode INTEGER,
+    note TEXT NOT NULL DEFAULT '',
+    CHECK(source_title_id != target_title_id)
+  );
 `)
 
 const creditColumns = db.prepare('PRAGMA table_info(credits)').all() as Array<{ name: string }>
@@ -67,6 +87,11 @@ if (!creditColumns.some((column) => column.name === 'billing_order')) {
   db.exec('ALTER TABLE credits ADD COLUMN billing_order INTEGER NOT NULL DEFAULT 9999')
   // Credit ids reflect insertion order for libraries created before billing order was stored.
   db.exec('UPDATE credits SET billing_order = id')
+}
+
+const personColumns = db.prepare('PRAGMA table_info(people)').all() as Array<{ name: string }>
+if (!personColumns.some((column) => column.name === 'favorite')) {
+  db.exec('ALTER TABLE people ADD COLUMN favorite INTEGER NOT NULL DEFAULT 0')
 }
 
 const titleCount = db.prepare('SELECT COUNT(*) AS count FROM titles').get() as { count: number }
@@ -123,7 +148,18 @@ const titleSelect = `
 `
 
 export function getSnapshot() {
-  const titles = db.prepare(titleSelect).all().map(mapTitle)
+  const tags = db.prepare('SELECT name FROM tags ORDER BY name COLLATE NOCASE').all() as Array<{ name: string }>
+  const tagsByTitle = new Map<number, string[]>()
+  const titleTagRows = db.prepare(`
+    SELECT tt.title_id, tags.name FROM title_tags tt JOIN tags ON tags.id = tt.tag_id
+    ORDER BY tags.name COLLATE NOCASE
+  `).all() as Array<{ title_id: number; name: string }>
+  titleTagRows.forEach((row) => {
+    const titleTags = tagsByTitle.get(row.title_id)
+    if (titleTags) titleTags.push(row.name)
+    else tagsByTitle.set(row.title_id, [row.name])
+  })
+  const titles = db.prepare(titleSelect).all().map((row: any) => ({ ...mapTitle(row), tags: tagsByTitle.get(row.id) || [] }))
   const people = db.prepare(`
     SELECT p.*, COUNT(c.id) AS title_count
     FROM people p LEFT JOIN credits c ON c.person_id = p.id
@@ -141,7 +177,18 @@ export function getSnapshot() {
     characterName: row.character_name, role: row.role, billingOrder: row.billing_order,
     titleName: row.title_name, personName: row.person_name,
   }))
-  return { titles, people, credits }
+  const titleLinks = db.prepare(`
+    SELECT l.*, source.name AS source_title_name, target.name AS target_title_name
+    FROM title_links l
+    JOIN titles source ON source.id = l.source_title_id
+    JOIN titles target ON target.id = l.target_title_id
+    ORDER BY l.id
+  `).all().map((row: any) => ({
+    id: row.id, sourceTitleId: row.source_title_id, targetTitleId: row.target_title_id,
+    sourceTitleName: row.source_title_name, targetTitleName: row.target_title_name,
+    episode: row.episode, note: row.note,
+  }))
+  return { titles, people, credits, tags: tags.map((tag) => tag.name), titleLinks }
 }
 
 export function createTitle(input: TitleInput) {
@@ -150,7 +197,9 @@ export function createTitle(input: TitleInput) {
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(input.name, input.type, input.year ?? null, input.status, input.episodesWatched ?? 0,
     input.episodesTotal ?? null, input.rating ?? null, input.posterUrl ?? '', input.asianwikiUrl ?? '', input.notes ?? '')
-  return Number(result.lastInsertRowid)
+  const id = Number(result.lastInsertRowid)
+  setTitleTags(id, input.tags || [])
+  return id
 }
 
 export function updateTitle(id: number, input: TitleInput) {
@@ -159,6 +208,7 @@ export function updateTitle(id: number, input: TitleInput) {
       poster_url=?, asianwiki_url=?, notes=?, updated_at=CURRENT_TIMESTAMP WHERE id=?
   `).run(input.name, input.type, input.year ?? null, input.status, input.episodesWatched ?? 0,
     input.episodesTotal ?? null, input.rating ?? null, input.posterUrl ?? '', input.asianwikiUrl ?? '', input.notes ?? '', id)
+  setTitleTags(id, input.tags || [])
 }
 
 export function deleteTitle(id: number) {
@@ -166,14 +216,40 @@ export function deleteTitle(id: number) {
 }
 
 export function createPerson(input: PersonInput) {
-  const result = db.prepare('INSERT INTO people (name, photo_url, asianwiki_url, notes) VALUES (?, ?, ?, ?)')
-    .run(input.name, input.photoUrl ?? '', input.asianwikiUrl ?? '', input.notes ?? '')
+  const result = db.prepare('INSERT INTO people (name, photo_url, asianwiki_url, notes, favorite) VALUES (?, ?, ?, ?, ?)')
+    .run(input.name, input.photoUrl ?? '', input.asianwikiUrl ?? '', input.notes ?? '', input.favorite ? 1 : 0)
   return Number(result.lastInsertRowid)
 }
 
 export function updatePerson(id: number, input: PersonInput) {
-  db.prepare('UPDATE people SET name=?, photo_url=?, asianwiki_url=?, notes=? WHERE id=?')
-    .run(input.name, input.photoUrl ?? '', input.asianwikiUrl ?? '', input.notes ?? '', id)
+  db.prepare('UPDATE people SET name=?, photo_url=?, asianwiki_url=?, notes=?, favorite=? WHERE id=?')
+    .run(input.name, input.photoUrl ?? '', input.asianwikiUrl ?? '', input.notes ?? '', input.favorite ? 1 : 0, id)
+}
+
+function setTitleTags(titleId: number, inputTags: string[]) {
+  const tags = [...new Set(inputTags.map(normalizeTag).filter(Boolean))]
+  db.prepare('DELETE FROM title_tags WHERE title_id = ?').run(titleId)
+  const addTag = db.prepare('INSERT INTO tags (name) VALUES (?) ON CONFLICT(name) DO NOTHING')
+  const findTag = db.prepare('SELECT id FROM tags WHERE name = ? COLLATE NOCASE')
+  const linkTag = db.prepare('INSERT OR IGNORE INTO title_tags (title_id, tag_id) VALUES (?, ?)')
+  tags.forEach((tag) => {
+    addTag.run(tag)
+    const row = findTag.get(tag) as { id: number }
+    linkTag.run(titleId, row.id)
+  })
+  db.exec('DELETE FROM tags WHERE NOT EXISTS (SELECT 1 FROM title_tags WHERE title_tags.tag_id = tags.id)')
+}
+
+export function createTitleLink(sourceTitleId: number, targetTitleId: number, episode: number | null, note: string) {
+  if (sourceTitleId === targetTitleId) throw new Error('A title cannot reference itself')
+  const result = db.prepare(`
+    INSERT INTO title_links (source_title_id, target_title_id, episode, note) VALUES (?, ?, ?, ?)
+  `).run(sourceTitleId, targetTitleId, episode, note)
+  return Number(result.lastInsertRowid)
+}
+
+export function deleteTitleLink(id: number) {
+  db.prepare('DELETE FROM title_links WHERE id = ?').run(id)
 }
 
 export function setCredit(titleId: number, personId: number, characterName: string, role: string, billingOrder = 9999) {
@@ -265,6 +341,8 @@ function mapTitle(row: any) {
 function mapPerson(row: any) {
   return {
     id: row.id, name: row.name, photoUrl: row.photo_url, asianwikiUrl: row.asianwiki_url,
-    notes: row.notes, titleCount: row.title_count,
+    notes: row.notes, favorite: Boolean(row.favorite), titleCount: row.title_count,
   }
 }
+
+const normalizeTag = (tag: string) => tag.trim().toLowerCase().replace(/\s+/g, '-')

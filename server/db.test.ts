@@ -15,17 +15,35 @@ test('seeds a connected starter library', () => {
 test('creates, updates, and deletes a title', () => {
   const id = database.createTitle({
     name: 'Test Drama', type: 'series', year: 2026, status: 'watchlist',
-    episodesWatched: 0, episodesTotal: 12, rating: null,
+    episodesWatched: 0, episodesTotal: 12, rating: null, tags: ['Time Travel', 'romance'],
   })
   database.updateTitle(id, {
     name: 'Test Drama', type: 'series', year: 2026, status: 'watching',
-    episodesWatched: 3, episodesTotal: 12, rating: 8,
+    episodesWatched: 3, episodesTotal: 12, rating: 8, tags: ['time-travel', 'found family'],
   })
   const created = database.getSnapshot().titles.find((title) => title.id === id)
   assert.equal(created?.status, 'watching')
   assert.equal(created?.episodesWatched, 3)
+  assert.deepEqual(created?.tags, ['found-family', 'time-travel'])
   database.deleteTitle(id)
   assert.equal(database.getSnapshot().titles.some((title) => title.id === id), false)
+})
+
+test('flags favorite people and stores title references', () => {
+  const sourceId = database.createTitle({ name: 'Reference Source', type: 'series', status: 'completed' })
+  const targetId = database.createTitle({ name: 'Referenced Movie', type: 'movie', status: 'completed' })
+  const personId = database.createPerson({ name: 'Favorite Actor', favorite: true, notes: 'Always memorable.' })
+  const linkId = database.createTitleLink(sourceId, targetId, 10, 'Parodies the basement scene.')
+  let snapshot = database.getSnapshot()
+  assert.equal(snapshot.people.find((person) => person.id === personId)?.favorite, true)
+  assert.deepEqual(snapshot.titleLinks.find((link) => link.id === linkId), {
+    id: linkId, sourceTitleId: sourceId, targetTitleId: targetId,
+    sourceTitleName: 'Reference Source', targetTitleName: 'Referenced Movie',
+    episode: 10, note: 'Parodies the basement scene.',
+  })
+  database.deleteTitleLink(linkId)
+  snapshot = database.getSnapshot()
+  assert.equal(snapshot.titleLinks.some((link) => link.id === linkId), false)
 })
 
 test('connects people to titles without duplicating an edge', () => {
