@@ -17,6 +17,9 @@ export const api = {
   createTitle: (body: TitleDraft) => request('/api/titles', { method: 'POST', body: JSON.stringify(body) }),
   updateTitle: (id: number, body: TitleDraft) => request(`/api/titles/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
   deleteTitle: (id: number) => request(`/api/titles/${id}`, { method: 'DELETE' }),
+  createTitleLink: (body: { sourceTitleId: number; targetTitleId: number; episode: number | null; note: string }) =>
+    request('/api/title-links', { method: 'POST', body: JSON.stringify(body) }),
+  deleteTitleLink: (id: number) => request(`/api/title-links/${id}`, { method: 'DELETE' }),
   createPerson: (body: PersonDraft) => request('/api/people', { method: 'POST', body: JSON.stringify(body) }),
   updatePerson: (id: number, body: PersonDraft) => request(`/api/people/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
   setCredit: (body: { titleId: number; personId: number; characterName: string; role: string }) =>

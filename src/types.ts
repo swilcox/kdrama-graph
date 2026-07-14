@@ -12,6 +12,7 @@ export type Title = {
   posterUrl: string
   asianwikiUrl: string
   notes: string
+  tags: string[]
   castCount: number
   updatedAt: string
 }
@@ -22,6 +23,7 @@ export type Person = {
   photoUrl: string
   asianwikiUrl: string
   notes: string
+  favorite: boolean
   titleCount: number
 }
 
@@ -36,7 +38,17 @@ export type Credit = {
   personName: string
 }
 
-export type Snapshot = { titles: Title[]; people: Person[]; credits: Credit[] }
+export type TitleLink = {
+  id: number
+  sourceTitleId: number
+  targetTitleId: number
+  sourceTitleName: string
+  targetTitleName: string
+  episode: number | null
+  note: string
+}
+
+export type Snapshot = { titles: Title[]; people: Person[]; credits: Credit[]; tags: string[]; titleLinks: TitleLink[] }
 
 export type TitleDraft = Omit<Title, 'id' | 'castCount' | 'updatedAt'>
 export type PersonDraft = Omit<Person, 'id' | 'titleCount'>

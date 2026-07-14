@@ -3,7 +3,7 @@ import { existsSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { z } from 'zod'
 import {
-  closeDatabase, createPerson, createTitle, databaseHealth, deleteCredit, deleteTitle,
+  closeDatabase, createPerson, createTitle, createTitleLink, databaseHealth, deleteCredit, deleteTitle, deleteTitleLink,
   getSnapshot, importAsianWiki, setCredit, updatePerson, updateTitle,
 } from './db.js'
 import { previewAsianWiki } from './asianwiki.js'
@@ -26,12 +26,14 @@ const titleSchema = z.object({
   posterUrl: z.string().max(1000).optional(),
   asianwikiUrl: z.union([z.string().url(), z.literal('')]).optional(),
   notes: z.string().max(10000).optional(),
+  tags: z.array(z.string().trim().min(1).max(40)).max(30).optional(),
 })
 const personSchema = z.object({
   name: z.string().trim().min(1).max(120),
   photoUrl: z.string().max(1000).optional(),
   asianwikiUrl: z.union([z.string().url(), z.literal('')]).optional(),
   notes: z.string().max(5000).optional(),
+  favorite: z.boolean().optional(),
 })
 
 app.get('/api/health', (_req, res) => {
@@ -50,6 +52,14 @@ app.put('/api/titles/:id', route(titleSchema, (body, req) => {
 }))
 app.delete('/api/titles/:id', (req, res) => {
   deleteTitle(Number(req.params.id))
+  res.json({ ok: true })
+})
+app.post('/api/title-links', route(z.object({
+  sourceTitleId: z.number().int().positive(), targetTitleId: z.number().int().positive(),
+  episode: z.number().int().positive().nullable(), note: z.string().trim().max(500),
+}), (body) => ({ id: createTitleLink(body.sourceTitleId, body.targetTitleId, body.episode, body.note) })))
+app.delete('/api/title-links/:id', (req, res) => {
+  deleteTitleLink(Number(req.params.id))
   res.json({ ok: true })
 })
 app.post('/api/people', route(personSchema, (body) => ({ id: createPerson(body) })))

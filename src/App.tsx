@@ -10,7 +10,7 @@ import type { Person, PersonDraft, Snapshot, Title, TitleDraft, WatchStatus } fr
 type View = 'dashboard' | 'library' | 'people'
 
 export default function App() {
-  const [data, setData] = useState<Snapshot>({ titles: [], people: [], credits: [] })
+  const [data, setData] = useState<Snapshot>({ titles: [], people: [], credits: [], tags: [], titleLinks: [] })
   const [view, setView] = useState<View>('dashboard')
   const [query, setQuery] = useState('')
   const [status, setStatus] = useState<WatchStatus | 'all'>('all')
@@ -69,10 +69,12 @@ export default function App() {
       </>}
     </main>
 
-    {editingTitle !== undefined && <TitleForm title={editingTitle} titles={data.titles} people={data.people} credits={data.credits} onClose={() => setEditingTitle(undefined)} onSave={saveTitle}
+    {editingTitle !== undefined && <TitleForm title={editingTitle} titles={data.titles} people={data.people} credits={data.credits} tags={data.tags} titleLinks={data.titleLinks} onClose={() => setEditingTitle(undefined)} onSave={saveTitle}
       onDelete={editingTitle ? async () => { if (confirm(`Delete ${editingTitle.name}?`)) { await api.deleteTitle(editingTitle.id); await reload(); setEditingTitle(undefined) } } : null}
       onAddCredit={async (personId, characterName, role) => { if (!editingTitle) return; await api.setCredit({ titleId: editingTitle.id, personId, characterName, role }); await reload() }}
-      onDeleteCredit={async (id) => { await api.deleteCredit(id); await reload() }} onOpenTitle={setEditingTitle} />}
+      onDeleteCredit={async (id) => { await api.deleteCredit(id); await reload() }}
+      onAddTitleLink={async (targetTitleId, episode, note) => { if (!editingTitle) return; await api.createTitleLink({ sourceTitleId: editingTitle.id, targetTitleId, episode, note }); await reload() }}
+      onDeleteTitleLink={async (id) => { await api.deleteTitleLink(id); await reload() }} onOpenTitle={setEditingTitle} />}
     {editingPerson !== undefined && <PersonForm person={editingPerson || undefined} credits={data.credits} titles={data.titles} onClose={() => setEditingPerson(undefined)} onSave={savePerson} />}
     {importing && <ImportAsianWiki onClose={() => setImporting(false)} onImported={async () => { await reload() }} />}
     <MobileNav view={view} setView={setView} />
@@ -105,15 +107,28 @@ function Dashboard({ data, openTitle, goTo }: { data: Snapshot; openTitle: (titl
 }
 
 function Library({ titles, status, setStatus, openTitle }: { titles: Title[]; status: WatchStatus | 'all'; setStatus: (s: WatchStatus | 'all') => void; openTitle: (t: Title) => void }) {
+  const [type, setType] = useState<'all' | Title['type']>('all')
+  const [sort, setSort] = useState<'updated' | 'rating' | 'title' | 'status'>('updated')
   const options: (WatchStatus | 'all')[] = ['all', 'watching', 'watchlist', 'completed', 'paused', 'dropped']
-  return <div className="page"><PageTitle eyebrow="All titles" title="Your library" aside={`${titles.length} ${titles.length === 1 ? 'title' : 'titles'}`} /><div className="filter-tabs">{options.map((item) => <button className={status === item ? 'active' : ''} onClick={() => setStatus(item)} key={item}>{item === 'all' ? 'All' : titleCase(item)}</button>)}</div><div className="title-table"><div className="table-head"><span>Title</span><span>Status</span><span>Progress</span><span>Cast</span><span>Rating</span><span /></div>{titles.map((title) => <button className="title-row" key={title.id} onClick={() => openTitle(title)}><span className="title-cell"><Artwork src={title.posterUrl} name={title.name} /><span><strong>{title.name}</strong><small>{title.type === 'series' ? <Tv /> : <Film />}{title.type} · {title.year ?? 'Year unknown'}</small></span></span><span><Status status={title.status} /></span><span>{title.type === 'series' ? `${title.episodesWatched} / ${title.episodesTotal ?? '?'}` : title.status === 'completed' ? 'Watched' : '—'}</span><span>{title.castCount} people</span><span className="rating">{title.rating ? <><Star />{title.rating}</> : '—'}</span><span>{title.asianwikiUrl && <a href={title.asianwikiUrl} onClick={(e) => e.stopPropagation()} target="_blank" rel="noreferrer" aria-label={`Open ${title.name} on AsianWiki`}><ExternalLink /></a>}</span></button>)}{!titles.length && <Empty title="No matching titles" copy="Try another filter or add something new." />}</div></div>
+  const visibleTitles = useMemo(() => titles.filter((title) => type === 'all' || title.type === type).sort((a, b) => {
+    if (sort === 'rating') return (b.rating ?? -1) - (a.rating ?? -1) || a.name.localeCompare(b.name)
+    if (sort === 'title') return a.name.localeCompare(b.name)
+    if (sort === 'status') return options.indexOf(a.status) - options.indexOf(b.status) || a.name.localeCompare(b.name)
+    return b.updatedAt.localeCompare(a.updatedAt)
+  }), [titles, type, sort])
+  return <div className="page"><PageTitle eyebrow="All titles" title="Your library" aside={`${visibleTitles.length} ${visibleTitles.length === 1 ? 'title' : 'titles'}`} />
+    <div className="library-controls"><div className="filter-tabs">{options.map((item) => <button className={status === item ? 'active' : ''} onClick={() => setStatus(item)} key={item}>{item === 'all' ? 'All' : titleCase(item)}</button>)}</div>
+      <div className="library-selects"><label>Type<select value={type} onChange={(e) => setType(e.target.value as typeof type)}><option value="all">All types</option><option value="series">Series</option><option value="movie">Movies</option></select></label><label>Sort<select value={sort} onChange={(e) => setSort(e.target.value as typeof sort)}><option value="updated">Recently updated</option><option value="rating">Rating: high to low</option><option value="title">Title: A–Z</option><option value="status">Status</option></select></label></div>
+    </div>
+    <div className="title-table"><div className="table-head"><span>Title</span><span>Status</span><span>Progress</span><span>Cast</span><span>Rating</span><span /></div>{visibleTitles.map((title) => <button className="title-row" key={title.id} onClick={() => openTitle(title)}><span className="title-cell"><Artwork src={title.posterUrl} name={title.name} /><span><strong>{title.name}</strong><small>{title.type === 'series' ? <Tv /> : <Film />}{title.type} · {title.year ?? 'Year unknown'}</small>{!!title.tags.length && <em>{title.tags.slice(0, 3).map((tag) => <i key={tag}>{tag}</i>)}</em>}</span></span><span><Status status={title.status} /></span><span>{title.type === 'series' ? `${title.episodesWatched} / ${title.episodesTotal ?? '?'}` : title.status === 'completed' ? 'Watched' : '—'}</span><span>{title.castCount} people</span><span className="rating">{title.rating ? <><Star />{title.rating}</> : '—'}</span><span>{title.asianwikiUrl && <a href={title.asianwikiUrl} onClick={(e) => e.stopPropagation()} target="_blank" rel="noreferrer" aria-label={`Open ${title.name} on AsianWiki`}><ExternalLink /></a>}</span></button>)}{!visibleTitles.length && <Empty title="No matching titles" copy="Try another filter or add something new." />}</div></div>
 }
 
 function People({ people, credits, titles, openPerson }: { people: Person[]; credits: Snapshot['credits']; titles: Title[]; openPerson: (p: Person) => void }) {
   const [sort, setSort] = useState<'name' | 'connections'>('name')
-  const sortedPeople = useMemo(() => [...people].sort((a, b) => sort === 'connections'
+  const [favoritesOnly, setFavoritesOnly] = useState(false)
+  const sortedPeople = useMemo(() => people.filter((person) => !favoritesOnly || person.favorite).sort((a, b) => sort === 'connections'
     ? b.titleCount - a.titleCount || a.name.localeCompare(b.name)
-    : a.name.localeCompare(b.name)), [people, sort])
+    : a.name.localeCompare(b.name)), [people, sort, favoritesOnly])
   const creditsByPerson = useMemo(() => {
     const byPerson = new Map<number, Snapshot['credits']>()
     credits.forEach((credit) => {
@@ -124,12 +139,15 @@ function People({ people, credits, titles, openPerson }: { people: Person[]; cre
     return byPerson
   }, [credits])
   const titlesById = useMemo(() => new Map(titles.map((title) => [title.id, title])), [titles])
-  return <div className="page"><PageTitle eyebrow="Cast index" title="People" aside={`${people.length} people`} />
-    <div className="filter-tabs" role="group" aria-label="Sort people">
+  return <div className="page"><PageTitle eyebrow="Cast index" title="People" aside={`${sortedPeople.length} ${sortedPeople.length === 1 ? 'person' : 'people'}`} />
+    <div className="people-controls"><div className="filter-tabs" role="group" aria-label="Filter people">
+      <button className={!favoritesOnly ? 'active' : ''} onClick={() => setFavoritesOnly(false)}>All</button>
+      <button className={favoritesOnly ? 'active' : ''} onClick={() => setFavoritesOnly(true)}><Star />Favorites</button>
+    </div><div className="filter-tabs" role="group" aria-label="Sort people">
       <button className={sort === 'name' ? 'active' : ''} onClick={() => setSort('name')}>Name</button>
       <button className={sort === 'connections' ? 'active' : ''} onClick={() => setSort('connections')}>Most connected</button>
-    </div>
-    <div className="people-grid">{sortedPeople.map((person) => { const links = creditsByPerson.get(person.id) || []; return <button className="person-card" key={person.id} onClick={() => openPerson(person)}><Artwork kind="person" src={person.photoUrl} name={person.name} /><div className="person-info"><div><strong>{person.name}</strong><span>{person.titleCount} linked {person.titleCount === 1 ? 'title' : 'titles'}</span></div><div className="person-titles">{links.slice(0, 3).map((credit) => <Artwork key={credit.id} src={titlesById.get(credit.titleId)?.posterUrl} name={credit.titleName} />)}</div></div></button>})}</div></div>
+    </div></div>
+    <div className="people-grid">{sortedPeople.map((person) => { const links = creditsByPerson.get(person.id) || []; return <button className="person-card" key={person.id} onClick={() => openPerson(person)}><Artwork kind="person" src={person.photoUrl} name={person.name} /><div className="person-info"><div><strong>{person.name}{person.favorite && <Star className="favorite-star" />}</strong><span>{person.titleCount} linked {person.titleCount === 1 ? 'title' : 'titles'}</span>{person.notes && <small>{person.notes}</small>}</div><div className="person-titles">{links.slice(0, 3).map((credit) => <Artwork key={credit.id} src={titlesById.get(credit.titleId)?.posterUrl} name={credit.titleName} />)}</div></div></button>})}{!sortedPeople.length && <Empty title="No favorite people yet" copy="Open a person and mark them as a favorite." />}</div></div>
 }
 
 function PageTitle({ eyebrow, title, aside }: { eyebrow: string; title: string; aside?: string }) { return <div className="page-title"><div><p className="eyebrow">{eyebrow}</p><h1>{title}</h1></div>{aside && <span>{aside}</span>}</div> }

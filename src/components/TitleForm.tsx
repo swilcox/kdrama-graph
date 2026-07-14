@@ -1,23 +1,27 @@
 import { useEffect, useState } from 'react'
-import { ExternalLink, Link2, Network, Save, Trash2, X } from 'lucide-react'
-import type { Credit, Person, Title, TitleDraft, WatchStatus } from '../types'
+import { ArrowRight, ExternalLink, Link2, Network, Plus, Save, Tag, Trash2, X } from 'lucide-react'
+import type { Credit, Person, Title, TitleDraft, TitleLink, WatchStatus } from '../types'
 import { Artwork } from './Artwork'
 
 const empty: TitleDraft = {
   name: '', type: 'series', year: new Date().getFullYear(), status: 'watchlist',
-  episodesWatched: 0, episodesTotal: 16, rating: null, posterUrl: '', asianwikiUrl: '', notes: '',
+  episodesWatched: 0, episodesTotal: 16, rating: null, posterUrl: '', asianwikiUrl: '', notes: '', tags: [],
 }
 
-export function TitleForm({ title, titles, people, credits, onClose, onSave, onDelete, onAddCredit, onDeleteCredit, onOpenTitle }: {
+export function TitleForm({ title, titles, people, credits, tags, titleLinks, onClose, onSave, onDelete, onAddCredit, onDeleteCredit, onAddTitleLink, onDeleteTitleLink, onOpenTitle }: {
   title: Title | null | undefined
   titles: Title[]
   people: Person[]
   credits: Credit[]
+  tags: string[]
+  titleLinks: TitleLink[]
   onClose: () => void
   onSave: (draft: TitleDraft) => Promise<void>
   onDelete: (() => Promise<void>) | null
   onAddCredit: (personId: number, characterName: string, role: string) => Promise<void>
   onDeleteCredit: (id: number) => Promise<void>
+  onAddTitleLink: (targetTitleId: number, episode: number | null, note: string) => Promise<void>
+  onDeleteTitleLink: (id: number) => Promise<void>
   onOpenTitle: (title: Title) => void
 }) {
   const [draft, setDraft] = useState<TitleDraft>(title ? pickDraft(title) : empty)
@@ -26,15 +30,31 @@ export function TitleForm({ title, titles, people, credits, onClose, onSave, onD
   const [role, setRole] = useState('Cast')
   const [saving, setSaving] = useState(false)
   const [connectionsOnly, setConnectionsOnly] = useState(false)
+  const [tagInput, setTagInput] = useState('')
+  const [linkedTitleId, setLinkedTitleId] = useState('')
+  const [linkEpisode, setLinkEpisode] = useState('')
+  const [linkNote, setLinkNote] = useState('')
   const titleCredits = title ? credits.filter((credit) => credit.titleId === title.id) : []
   const visibleCredits = connectionsOnly
     ? titleCredits.filter((credit) => credits.some((other) => other.personId === credit.personId && other.titleId !== title?.id))
     : titleCredits
   const connectedCastCount = titleCredits.filter((credit) => credits.some((other) => other.personId === credit.personId && other.titleId !== title?.id)).length
   const availablePeople = people.filter((person) => !titleCredits.some((credit) => credit.personId === person.id))
+  const relatedTitleLinks = title ? titleLinks.filter((link) => link.sourceTitleId === title.id || link.targetTitleId === title.id) : []
 
-  useEffect(() => setDraft(title ? pickDraft(title) : empty), [title])
+  useEffect(() => {
+    setDraft(title ? pickDraft(title) : empty)
+    setTagInput('')
+    setLinkedTitleId('')
+    setLinkEpisode('')
+    setLinkNote('')
+  }, [title])
   const field = <K extends keyof TitleDraft>(key: K, value: TitleDraft[K]) => setDraft((current) => ({ ...current, [key]: value }))
+  const addTag = () => {
+    const tag = normalizeTag(tagInput)
+    if (tag && !draft.tags.includes(tag) && draft.tags.length < 30) field('tags', [...draft.tags, tag])
+    setTagInput('')
+  }
 
   return (
     <div className="scrim" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
@@ -44,7 +64,13 @@ export function TitleForm({ title, titles, people, credits, onClose, onSave, onD
           <button className="icon-button" onClick={onClose} aria-label="Close"><X /></button>
         </header>
 
-        <form onSubmit={async (event) => { event.preventDefault(); setSaving(true); await onSave(draft).finally(() => setSaving(false)) }}>
+        <form onSubmit={async (event) => {
+          event.preventDefault()
+          const pendingTag = normalizeTag(tagInput)
+          const saveDraft = pendingTag && !draft.tags.includes(pendingTag) ? { ...draft, tags: [...draft.tags, pendingTag] } : draft
+          setSaving(true)
+          await onSave(saveDraft).finally(() => setSaving(false))
+        }}>
           <div className="form-intro">
             <Artwork src={draft.posterUrl} name={draft.name || 'New title'} />
             <div className="field grow"><label>Title</label><input autoFocus required value={draft.name} onChange={(e) => field('name', e.target.value)} placeholder="Drama or movie name" /></div>
@@ -65,11 +91,35 @@ export function TitleForm({ title, titles, people, credits, onClose, onSave, onD
             <div className="field"><label>Rating / 10</label><input type="number" min="0" max="10" step="0.5" value={draft.rating ?? ''} onChange={(e) => field('rating', e.target.value ? Number(e.target.value) : null)} placeholder="Not rated" /></div>
             {draft.type === 'series' && <><div className="field"><label>Episodes watched</label><input type="number" min="0" value={draft.episodesWatched} onChange={(e) => field('episodesWatched', Number(e.target.value))} /></div><div className="field"><label>Total episodes</label><input type="number" min="1" value={draft.episodesTotal ?? ''} onChange={(e) => field('episodesTotal', e.target.value ? Number(e.target.value) : null)} /></div></>}
           </div>
+          <div className="field"><label>Tags</label>
+            <div className="tag-input-row"><div className="input-action"><input list="title-tag-suggestions" value={tagInput} onChange={(e) => setTagInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); addTag() } }} placeholder="Type or choose a tag" /><button type="button" onClick={addTag} aria-label="Add tag"><Plus /></button></div></div>
+            <datalist id="title-tag-suggestions">{tags.filter((tag) => !draft.tags.includes(tag)).map((tag) => <option key={tag} value={tag} />)}</datalist>
+            {!!draft.tags.length && <div className="tag-list">{draft.tags.map((tag) => <span key={tag}><Tag />{tag}<button type="button" onClick={() => field('tags', draft.tags.filter((item) => item !== tag))} aria-label={`Remove ${tag}`}><X /></button></span>)}</div>}
+          </div>
           <div className="field"><label>Poster image URL</label><input type="url" value={draft.posterUrl} onChange={(e) => field('posterUrl', e.target.value)} placeholder="https://..." /></div>
           <div className="field"><label>AsianWiki URL</label><div className="input-action"><input type="url" value={draft.asianwikiUrl} onChange={(e) => field('asianwikiUrl', e.target.value)} placeholder="https://asianwiki.com/..." />{draft.asianwikiUrl && <a href={draft.asianwikiUrl} target="_blank" rel="noreferrer" aria-label="Open AsianWiki"><ExternalLink /></a>}</div></div>
           <div className="field"><label>Notes & review</label><textarea rows={5} value={draft.notes} onChange={(e) => field('notes', e.target.value)} placeholder="What worked, favorite moments, whether you'd rewatch..." /></div>
 
           {title && <TitleActions className="drawer-actions drawer-actions-before-cast" onDelete={onDelete} saving={saving} />}
+
+          {title && <section className="cast-editor title-links-editor">
+            <div className="section-heading"><div><p className="eyebrow">References</p><h3>Linked titles</h3></div><span>{relatedTitleLinks.length}</span></div>
+            <div className="title-link-list">{relatedTitleLinks.map((link) => {
+              const outgoing = link.sourceTitleId === title.id
+              const otherTitleId = outgoing ? link.targetTitleId : link.sourceTitleId
+              const otherTitle = titles.find((item) => item.id === otherTitleId)
+              return <div className="title-link-row" key={link.id}>
+                <div><span>{outgoing ? 'References' : 'Referenced by'}{link.episode && ` · Episode ${link.episode}`}</span><button type="button" onClick={() => otherTitle && onOpenTitle(otherTitle)}>{outgoing ? title.name : link.sourceTitleName}<ArrowRight />{outgoing ? link.targetTitleName : title.name}</button>{link.note && <small>{link.note}</small>}</div>
+                <button type="button" className="icon-button subtle" onClick={() => onDeleteTitleLink(link.id)} aria-label="Delete title reference"><Trash2 /></button>
+              </div>
+            })}{!relatedTitleLinks.length && <p className="empty-copy">Record parodies, mentions, and titles watched by the characters.</p>}</div>
+            <div className="add-title-link">
+              <select aria-label="Referenced title" value={linkedTitleId} onChange={(e) => setLinkedTitleId(e.target.value)}><option value="">Select referenced title...</option>{titles.filter((item) => item.id !== title.id).sort((a, b) => a.name.localeCompare(b.name)).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select>
+              <input type="number" min="1" value={linkEpisode} onChange={(e) => setLinkEpisode(e.target.value)} placeholder="Episode" aria-label="Episode" />
+              <input value={linkNote} onChange={(e) => setLinkNote(e.target.value)} placeholder="What is the connection?" />
+              <button type="button" className="button secondary" disabled={!linkedTitleId} onClick={async () => { await onAddTitleLink(Number(linkedTitleId), linkEpisode ? Number(linkEpisode) : null, linkNote); setLinkedTitleId(''); setLinkEpisode(''); setLinkNote('') }}><Link2 />Link</button>
+            </div>
+          </section>}
 
           {title && <section className="cast-editor connection-browser">
             <div className="section-heading connection-heading"><div><p className="eyebrow">Connections</p><h3>Cast history</h3></div><span>{connectedCastCount} of {titleCredits.length} connected elsewhere</span></div>
@@ -120,5 +170,6 @@ function TitleActions({ className, onDelete, saving }: {
 
 const statusOptions: WatchStatus[] = ['watchlist', 'watching', 'completed', 'paused', 'dropped']
 const label = (status: string) => status.charAt(0).toUpperCase() + status.slice(1)
-const pickDraft = ({ name, type, year, status, episodesWatched, episodesTotal, rating, posterUrl, asianwikiUrl, notes }: Title): TitleDraft =>
-  ({ name, type, year, status, episodesWatched, episodesTotal, rating, posterUrl, asianwikiUrl, notes })
+const pickDraft = ({ name, type, year, status, episodesWatched, episodesTotal, rating, posterUrl, asianwikiUrl, notes, tags }: Title): TitleDraft =>
+  ({ name, type, year, status, episodesWatched, episodesTotal, rating, posterUrl, asianwikiUrl, notes, tags })
+const normalizeTag = (tag: string) => tag.trim().toLowerCase().replace(/\s+/g, '-')
