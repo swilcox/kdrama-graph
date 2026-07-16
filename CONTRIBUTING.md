@@ -2,7 +2,7 @@
 
 ## Development
 
-Use Node.js 24 and pnpm 10.12.1.
+Use Node.js 24 or newer and pnpm 11.13.1.
 
 ```bash
 pnpm install --frozen-lockfile

@@ -8,7 +8,7 @@ Paste an AsianWiki title URL into **Import** to preview and import its metadata 
 
 ## Run locally
 
-Requirements: Node.js 22+ and pnpm.
+Requirements: Node.js 24+ and pnpm 11.13.1.
 
 ```bash
 pnpm install
