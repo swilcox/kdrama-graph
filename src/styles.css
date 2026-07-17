@@ -58,8 +58,11 @@ main { min-width: 0; }
 .eyebrow { margin: 0; text-transform: uppercase; letter-spacing: 1.4px; font-size: 10px; font-weight: 700; color: var(--coral); }
 
 .stat-band { display: grid; grid-template-columns: repeat(4, 1fr); border: 1px solid var(--line); background: var(--white); }
-.stat { min-width: 0; display: grid; grid-template-columns: 42px 1fr; gap: 14px; align-items: start; padding: 22px; border-right: 1px solid var(--line); }
+.stat { min-width: 0; display: grid; grid-template-columns: 42px 1fr; gap: 14px; align-items: start; padding: 22px; border: 0; border-right: 1px solid var(--line); background: transparent; color: inherit; text-align: left; }
 .stat:last-child { border-right: 0; }
+.stat-link { cursor: pointer; }
+.stat-link:hover { background: #faf9f6; }
+.stat-link:focus-visible { position: relative; outline: 2px solid var(--teal); outline-offset: -2px; }
 .stat-icon { width: 42px; height: 42px; display: grid; place-items: center; background: #f1eee8; color: var(--coral); border-radius: 4px; }
 .stat:nth-child(2) .stat-icon { color: var(--teal); background: #edf4f2; }
 .stat:nth-child(3) .stat-icon { color: #b27c00; background: #fbf5e5; }
@@ -91,11 +94,12 @@ main { min-width: 0; }
 .continue-item > .rating { align-self: center; padding: 5px 7px; background: #f6f4ec; }
 
 .connected-list { background: var(--white); border: 1px solid var(--line); padding: 4px 14px; }
-.connected-list > div { display: grid; grid-template-columns: 24px 38px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid #ecebe6; }
-.connected-list > div:last-child { border: 0; }
+.connected-list > button { width: 100%; display: grid; grid-template-columns: 24px 38px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 10px 0; border: 0; border-bottom: 1px solid #ecebe6; background: transparent; text-align: left; cursor: pointer; }
+.connected-list > button:hover { background: #faf9f6; }
+.connected-list > button:last-child { border: 0; }
 .connected-list .rank { font: 600 10px 'Manrope'; color: #a5a49e; }
 .connected-list .artwork { width: 38px; height: 38px; }
-.connected-list div > div:nth-child(3) { min-width: 0; display: flex; flex-direction: column; }
+.connected-list button > div:nth-child(3) { min-width: 0; display: flex; flex-direction: column; }
 .connected-list strong { font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .connected-list small { color: var(--muted); font-size: 9px; }
 .connection-bars { display: flex; gap: 2px; align-items: flex-end; height: 16px; }
@@ -124,9 +128,16 @@ main { min-width: 0; }
 .filter-tabs button.active { background: #fff; color: var(--ink); border-color: var(--line); font-weight: 600; }
 .filter-tabs button svg { width: 13px; height: 13px; vertical-align: -2px; margin-right: 4px; }
 .library-controls, .people-controls { display: flex; align-items: start; justify-content: space-between; gap: 16px; }
-.library-selects { display: flex; gap: 8px; }
+.library-selects { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8px; }
 .library-selects label { display: flex; align-items: center; gap: 6px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; font-size: 9px; font-weight: 700; }
 .library-selects select { min-height: 32px; padding: 0 28px 0 9px; border: 1px solid var(--line); border-radius: 3px; background: #fff; color: var(--ink); font-size: 11px; }
+.tag-filters { min-height: 38px; display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin: -2px 0 14px; }
+.tag-filters > label { display: inline-flex; align-items: center; gap: 5px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; font-size: 9px; font-weight: 700; }
+.tag-filters > label svg { width: 12px; height: 12px; color: var(--teal); }
+.tag-filters > select { min-height: 30px; padding: 0 28px 0 9px; border: 1px solid var(--line); border-radius: 3px; background: #fff; color: var(--ink); font-size: 10px; }
+.tag-filters > button { min-height: 27px; display: inline-flex; align-items: center; gap: 5px; padding: 3px 5px 3px 9px; border: 1px solid #c9d7d4; border-radius: 14px; background: #edf4f2; color: #286b63; font-size: 10px; cursor: pointer; }
+.tag-filters > button svg { width: 12px; height: 12px; }
+.tag-filters > small { color: var(--muted); font-size: 9px; }
 .title-table { border-top: 2px solid #2f302e; }
 .table-head, .title-row { display: grid; grid-template-columns: minmax(280px, 2fr) minmax(100px, .7fr) minmax(90px, .6fr) minmax(80px, .55fr) 70px 28px; align-items: center; gap: 14px; }
 .table-head { padding: 10px 14px; color: var(--muted); text-transform: uppercase; font-size: 9px; letter-spacing: .8px; }
@@ -222,8 +233,11 @@ main { min-width: 0; }
 .connection-row:last-child { border: 1px solid var(--line); }
 .connection-row.multi-connected { border-left: 3px solid var(--teal); }
 .connection-person { min-height: 58px; padding: 8px 9px; display: flex; align-items: center; gap: 10px; }
-.connection-person .artwork { width: 40px; height: 40px; }
-.connection-person > div:nth-child(2) { min-width: 0; display: flex; flex-direction: column; }
+.connection-person-profile { min-width: 0; flex: 1; display: flex; align-items: center; gap: 10px; padding: 0; border: 0; background: transparent; text-align: left; cursor: pointer; }
+.connection-person-profile:hover strong { color: var(--teal); }
+.connection-person-profile:disabled { cursor: default; }
+.connection-person-profile .artwork { width: 40px; height: 40px; }
+.connection-person-profile > div { min-width: 0; display: flex; flex-direction: column; }
 .connection-person strong { font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .connection-person span { margin-top: 2px; }
 .connection-person em { margin-left: auto; display: inline-flex; align-items: center; gap: 4px; padding: 4px 7px; background: #e8f2f0; color: #22685f; border-radius: 3px; font-size: 9px; font-weight: 700; font-style: normal; white-space: nowrap; }
@@ -343,7 +357,7 @@ main { min-width: 0; }
   .title-row > span:nth-child(n+3) { display: none; }
   .people-grid { grid-template-columns: 1fr; }
   .library-controls { display: block; }
-  .library-selects { margin: -4px 0 15px; }
+  .library-selects { justify-content: flex-start; margin: -4px 0 15px; }
 }
 
 @media (max-width: 560px) {

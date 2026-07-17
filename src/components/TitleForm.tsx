@@ -8,7 +8,7 @@ const empty: TitleDraft = {
   episodesWatched: 0, episodesTotal: 16, rating: null, posterUrl: '', asianwikiUrl: '', notes: '', tags: [],
 }
 
-export function TitleForm({ title, titles, people, credits, tags, titleLinks, onClose, onSave, onDelete, onAddCredit, onDeleteCredit, onAddTitleLink, onDeleteTitleLink, onOpenTitle }: {
+export function TitleForm({ title, titles, people, credits, tags, titleLinks, onClose, onSave, onDelete, onAddCredit, onDeleteCredit, onAddTitleLink, onDeleteTitleLink, onOpenTitle, onOpenPerson }: {
   title: Title | null | undefined
   titles: Title[]
   people: Person[]
@@ -23,6 +23,7 @@ export function TitleForm({ title, titles, people, credits, tags, titleLinks, on
   onAddTitleLink: (targetTitleId: number, episode: number | null, note: string) => Promise<void>
   onDeleteTitleLink: (id: number) => Promise<void>
   onOpenTitle: (title: Title) => void
+  onOpenPerson: (person: Person) => void
 }) {
   const [draft, setDraft] = useState<TitleDraft>(title ? pickDraft(title) : empty)
   const [personId, setPersonId] = useState('')
@@ -132,7 +133,7 @@ export function TitleForm({ title, titles, people, credits, tags, titleLinks, on
                 const person = people.find((item) => item.id === credit.personId)
                 const otherCredits = credits.filter((other) => other.personId === credit.personId && other.titleId !== title.id)
                 return <div className={`credit-row connection-row ${otherCredits.length ? 'multi-connected' : ''}`} key={credit.id}>
-                  <div className="connection-person"><Artwork kind="person" src={person?.photoUrl} name={credit.personName} /><div><strong>{credit.personName}</strong><span>{credit.characterName || credit.role} · {credit.role}</span></div>{otherCredits.length > 0 && <em><Link2 />{otherCredits.length} other {otherCredits.length === 1 ? 'title' : 'titles'}</em>}<button type="button" className="icon-button subtle" onClick={() => onDeleteCredit(credit.id)} aria-label={`Remove ${credit.personName}`}><X /></button></div>
+                  <div className="connection-person"><button type="button" className="connection-person-profile" disabled={!person} onClick={() => person && onOpenPerson(person)}><Artwork kind="person" src={person?.photoUrl} name={credit.personName} /><div><strong>{credit.personName}</strong><span>{credit.characterName || credit.role} · {credit.role}</span></div></button>{otherCredits.length > 0 && <em><Link2 />{otherCredits.length} other {otherCredits.length === 1 ? 'title' : 'titles'}</em>}<button type="button" className="icon-button subtle" onClick={() => onDeleteCredit(credit.id)} aria-label={`Remove ${credit.personName}`}><X /></button></div>
                   {otherCredits.length ? <div className="also-in"><span>Also in your library</span><div>{otherCredits.map((other) => {
                     const linkedTitle = titles.find((item) => item.id === other.titleId)
                     return linkedTitle ? <button type="button" key={other.id} onClick={() => onOpenTitle(linkedTitle)}><Artwork src={linkedTitle.posterUrl} name={linkedTitle.name} /><span><strong>{linkedTitle.name}</strong><small>{other.characterName || other.role}</small></span></button> : null
