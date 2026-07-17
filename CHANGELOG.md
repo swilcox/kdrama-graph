@@ -3,6 +3,13 @@
 All notable changes to Scene Map are documented in this file. Releases follow
 [Semantic Versioning](https://semver.org/) and are managed by Release Please.
 
+## [0.4.0](https://github.com/swilcox/kdrama-graph/compare/v0.3.0...v0.4.0) (2026-07-17)
+
+
+### Features
+
+* improve library navigation and filtering ([#19](https://github.com/swilcox/kdrama-graph/issues/19)) ([ad50c64](https://github.com/swilcox/kdrama-graph/commit/ad50c645dcfd8adf6018bd7d2892b9da0b7d4d0f))
+
 ## [0.3.0](https://github.com/swilcox/kdrama-graph/compare/v0.2.0...v0.3.0) (2026-07-14)
 
 
