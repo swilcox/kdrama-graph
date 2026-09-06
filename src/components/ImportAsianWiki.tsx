@@ -6,6 +6,7 @@ import { Artwork } from './Artwork'
 
 export function ImportAsianWiki({ onClose, onImported }: { onClose: () => void; onImported: (titleId: number) => Promise<void> }) {
   const [url, setUrl] = useState('')
+  const [savedFile, setSavedFile] = useState<File | null>(null)
   const [preview, setPreview] = useState<AsianWikiPreview | null>(null)
   const [status, setStatus] = useState<WatchStatus>('watchlist')
   const [castLimit, setCastLimit] = useState(500)
@@ -13,10 +14,11 @@ export function ImportAsianWiki({ onClose, onImported }: { onClose: () => void; 
   const [error, setError] = useState('')
   const [result, setResult] = useState<{ created: boolean; peopleCreated: number; creditsCreated: number } | null>(null)
 
-  const loadPreview = async () => {
-    setBusy(true); setError(''); setResult(null)
+  const loadPreview = async (file?: File) => {
+    setBusy(true); setError(''); setResult(null); setPreview(null)
     try {
-      const data = await api.previewAsianWiki(url)
+      if (file && file.size > 2 * 1024 * 1024) throw new Error('Choose an HTML file smaller than 2 MB')
+      const data = await api.previewAsianWiki(url, file ? await file.text() : undefined)
       setPreview(data)
       setCastLimit(data.cast.length)
     } catch (err) { setError(message(err)) }
@@ -38,9 +40,17 @@ export function ImportAsianWiki({ onClose, onImported }: { onClose: () => void; 
       <header className="drawer-header"><div><p className="eyebrow">Automatic metadata</p><h2>Import from AsianWiki</h2></div><button className="icon-button" onClick={onClose} aria-label="Close"><X /></button></header>
       <div className="import-body">
         <form className="import-url" onSubmit={(event) => { event.preventDefault(); loadPreview() }}>
-          <div className="field"><label>AsianWiki title URL</label><div className="import-url-row"><input autoFocus required type="url" value={url} onChange={(event) => { setUrl(event.target.value); setPreview(null); setResult(null) }} placeholder="https://asianwiki.com/..." /><button className="button secondary" disabled={busy}>{busy && !preview ? <LoaderCircle className="spin" /> : <Download />}Preview</button></div></div>
+          <div className="field"><label htmlFor="asianwiki-url">AsianWiki title URL</label><div className="import-url-row"><input id="asianwiki-url" autoFocus required type="url" disabled={busy} value={url} onChange={(event) => { setUrl(event.target.value); setPreview(null); setResult(null); setError('') }} placeholder="https://asianwiki.com/..." /><button className="button secondary" disabled={busy}>{busy && !preview ? <LoaderCircle className="spin" /> : <Download />}Preview</button></div></div>
         </form>
         {error && <div className="inline-error">{error}</div>}
+        <details className="import-saved">
+          <summary>Blocked? Import a saved page</summary>
+          <p>Open the title on AsianWiki and wait for the cast to appear. Use your browser’s Save Page As command and choose HTML only. Enter the same title URL above, then select the saved .html file here (up to 2 MB).</p>
+          <form onSubmit={(event) => { event.preventDefault(); if (savedFile) loadPreview(savedFile) }}>
+            <div className="field"><label htmlFor="asianwiki-html">Saved AsianWiki page</label><input id="asianwiki-html" type="file" accept=".html,.htm,text/html" required disabled={busy} onChange={(event) => { setSavedFile(event.target.files?.[0] ?? null); setPreview(null); setResult(null); setError('') }} /></div>
+            <button className="button secondary" disabled={busy || !savedFile || !url.trim()}><Download />Preview saved HTML</button>
+          </form>
+        </details>
         {!preview && !busy && <div className="import-empty"><Download /><h3>Paste one title page</h3><p>Scene Map will collect its poster, year, episode count, cast profiles, character names, and source links.</p></div>}
         {busy && !preview && <div className="import-empty"><LoaderCircle className="spin" /><h3>Reading AsianWiki...</h3><p>Large cast pages can take a few seconds.</p></div>}
         {preview && <>

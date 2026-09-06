@@ -6,6 +6,8 @@ A local-first K-drama and Korean film journal. Track watch status, episode progr
 
 Paste an AsianWiki title URL into **Import** to preview and import its metadata and cast. Imports are explicit, rate-friendly single-page requests; the app does not crawl AsianWiki in the background. Existing titles and people are reused when possible.
 
+If AsianWiki blocks the automatic request with HTTP 403 but opens in your browser, save the loaded title page using **Save Page As → HTML only**. In Import, enter the same AsianWiki URL, expand **Blocked? Import a saved page**, choose the `.html` file (up to 2 MB), and click **Preview saved HTML**. Review and import the cast as usual. Saved HTML is parsed locally by the Scene Map server; its scripts are not executed. Use HTML only so image links still point to AsianWiki instead of a local companion folder.
+
 ## Run locally
 
 Requirements: Node.js 24+ and pnpm 11.13.1.

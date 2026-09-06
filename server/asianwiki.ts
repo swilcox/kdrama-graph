@@ -20,19 +20,21 @@ export type AsianWikiPreview = {
   }>
 }
 
-export async function previewAsianWiki(inputUrl: string): Promise<AsianWikiPreview> {
+export async function previewAsianWiki(inputUrl: string, savedHtml?: string): Promise<AsianWikiPreview> {
   const sourceUrl = normalizeAsianWikiUrl(inputUrl)
+  if (savedHtml !== undefined) {
+    if (Buffer.byteLength(savedHtml, 'utf8') > 2 * 1024 * 1024) throw new Error('Choose an HTML file smaller than 2 MB')
+    return parseAsianWikiHtml(savedHtml, sourceUrl)
+  }
   const pageName = decodeURIComponent(new URL(sourceUrl).pathname.slice(1))
   const printableUrl = `${BASE}/index.php?title=${encodeURIComponent(pageName)}&printable=yes`
   const response = await fetch(printableUrl, {
     headers: { 'User-Agent': USER_AGENT, Accept: 'text/html,application/xhtml+xml' },
     signal: AbortSignal.timeout(20_000),
   })
+  if (response.status === 403) throw new Error('AsianWiki blocked the automatic request (HTTP 403). Open the page in your browser, save it as HTML, and use “Preview saved HTML” below.')
   if (!response.ok) throw new Error(`AsianWiki returned HTTP ${response.status}`)
   const html = await response.text()
-  if (html.includes('Attention Required!') || html.includes('cf-error-details')) {
-    throw new Error('AsianWiki blocked the request. Wait a few minutes and try again.')
-  }
   return parseAsianWikiHtml(html, sourceUrl)
 }
 
@@ -49,6 +51,19 @@ export function normalizeAsianWikiUrl(input: string) {
 
 export function parseAsianWikiHtml(html: string, sourceUrl: string): AsianWikiPreview {
   const $ = cheerio.load(html)
+  if ($('#cf-error-details, #challenge-form').length || /Attention Required!|Just a moment/i.test($('title').text())) {
+    throw new Error('This is an AsianWiki protection page. Open the title in your browser until its cast is visible, save it as HTML, and use “Preview saved HTML” below.')
+  }
+  // Browsers may turn actor links into absolute URLs when saving a page.
+  $('a[href]').each((_, element) => {
+    const href = $(element).attr('href') || ''
+    try {
+      const url = new URL(href, BASE)
+      if (/^https?:$/.test(url.protocol) && url.hostname.replace(/^www\./, '') === 'asianwiki.com') {
+        $(element).attr('href', url.pathname + url.search + url.hash)
+      }
+    } catch { /* Leave unrecognized links for the parser to ignore. */ }
+  })
   const content = $('#mw-content-text')
   const pageTitle = $('h1').first().text().trim()
   if (!pageTitle || !content.length || !content.find('#Profile').length) throw new Error('Could not recognize this AsianWiki title page')

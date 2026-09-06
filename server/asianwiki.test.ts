@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { normalizeAsianWikiUrl, parseAsianWikiHtml } from './asianwiki.js'
+import { normalizeAsianWikiUrl, parseAsianWikiHtml, previewAsianWiki } from './asianwiki.js'
 
 const fixture = `
   <html><body><h1>Test Drama</h1><div id="mw-content-text">
@@ -43,4 +43,51 @@ test('parses title metadata and cast tables', () => {
     photoUrl: '', characterName: 'Detective Park', role: 'Supporting', billingOrder: 1,
   })
   assert.equal(parsed.cast.length, 2)
+})
+
+test('previews saved HTML without requesting AsianWiki', async (t) => {
+  const fetchMock = t.mock.method(globalThis, 'fetch', () => { throw new Error('Unexpected network request') })
+  const parsed = await previewAsianWiki('https://www.asianwiki.com/Test_Drama', fixture)
+  assert.equal(parsed.sourceUrl, 'https://asianwiki.com/Test_Drama')
+  assert.equal(parsed.name, 'Test Drama')
+  assert.equal(parsed.cast.length, 2)
+  assert.equal(fetchMock.mock.callCount(), 0)
+})
+
+test('parses absolute actor links in browser-saved HTML', () => {
+  const saved = fixture.replaceAll('href="/Actor_', 'href="https://asianwiki.com/Actor_')
+  assert.deepEqual(parseAsianWikiHtml(saved, 'https://asianwiki.com/Test_Drama'), parseAsianWikiHtml(fixture, 'https://asianwiki.com/Test_Drama'))
+})
+
+test('explains how to recover from HTTP 403', async (t) => {
+  t.mock.method(globalThis, 'fetch', async () => new Response('Forbidden', { status: 403 }))
+  await assert.rejects(previewAsianWiki('https://asianwiki.com/Test_Drama'), /HTTP 403.*Preview saved HTML/)
+})
+
+test('still fetches and parses automatic previews', async (t) => {
+  const fetchMock = t.mock.method(globalThis, 'fetch', async () => new Response(fixture))
+  const parsed = await previewAsianWiki('https://asianwiki.com/Test_Drama')
+  assert.equal(parsed.cast.length, 2)
+  assert.equal(fetchMock.mock.calls[0].arguments[0], 'https://asianwiki.com/index.php?title=Test_Drama&printable=yes')
+})
+
+test('preserves other upstream HTTP errors', async (t) => {
+  t.mock.method(globalThis, 'fetch', async () => new Response('Not found', { status: 404 }))
+  await assert.rejects(previewAsianWiki('https://asianwiki.com/Test_Drama'), /HTTP 404/)
+})
+
+test('rejects protection pages returned with HTTP 200 or saved from a browser', async (t) => {
+  const blocked = '<html><head><title>Just a moment...</title></head><body><form id="challenge-form"></form></body></html>'
+  t.mock.method(globalThis, 'fetch', async () => new Response(blocked))
+  await assert.rejects(previewAsianWiki('https://asianwiki.com/Test_Drama'), /protection page/)
+  await assert.rejects(previewAsianWiki('https://asianwiki.com/Test_Drama', blocked), /protection page/)
+  assert.throws(() => parseAsianWikiHtml('<div id="cf-error-details">Blocked</div>', 'https://asianwiki.com/Test_Drama'), /protection page/)
+})
+
+test('validates saved HTML and its source URL before any network request', async (t) => {
+  const fetchMock = t.mock.method(globalThis, 'fetch', () => { throw new Error('Unexpected network request') })
+  await assert.rejects(previewAsianWiki('https://example.com/Test_Drama', fixture), /Only asianwiki/)
+  await assert.rejects(previewAsianWiki('https://asianwiki.com/Test_Drama', ''), /Could not recognize/)
+  await assert.rejects(previewAsianWiki('https://asianwiki.com/Test_Drama', '한'.repeat(1024 * 1024)), /smaller than 2 MB/)
+  assert.equal(fetchMock.mock.callCount(), 0)
 })

@@ -12,6 +12,8 @@ const app = express()
 const port = Number(process.env.PORT || 8787)
 const appVersion = process.env.APP_VERSION || 'dev'
 const appRevision = process.env.APP_REVISION || 'unknown'
+// Allow JSON escaping overhead for the preview's 2 MB saved HTML limit.
+app.use('/api/import/asianwiki/preview', express.json({ limit: '12mb' }))
 app.use(express.json({ limit: '1mb' }))
 let shuttingDown = false
 
@@ -78,8 +80,8 @@ app.delete('/api/credits/:id', (req, res) => {
   deleteCredit(Number(req.params.id))
   res.json({ ok: true })
 })
-app.post('/api/import/asianwiki/preview', route(z.object({ url: z.string().url() }), async (body) => {
-  return await previewAsianWiki(body.url)
+app.post('/api/import/asianwiki/preview', route(z.object({ url: z.string().url(), html: z.string().min(1).max(2 * 1024 * 1024).optional() }), async (body) => {
+  return await previewAsianWiki(body.url, body.html)
 }))
 app.post('/api/import/asianwiki', route(z.object({
   preview: z.object({
