@@ -288,6 +288,7 @@ main { min-width: 0; }
 .import-saved summary { cursor: pointer; color: var(--teal); font-weight: 600; }
 .import-saved p { color: var(--muted); line-height: 1.5; }
 .import-saved input[type=file] { max-width: 100%; }
+.import-saved small, .import-image-count { color: var(--muted); font-size: 11px; line-height: 1.5; }
 .import-empty { min-height: 270px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; color: var(--muted); }
 .import-empty > svg { width: 34px; height: 34px; color: #9a9991; }
 .import-empty h3 { margin: 14px 0 6px; color: var(--ink); font: 700 15px 'Manrope'; }

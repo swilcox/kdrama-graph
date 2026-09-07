@@ -13,6 +13,7 @@ async function request(path: string, init?: RequestInit) {
 }
 
 export const api = {
+  uploadImage: (file: File) => request('/api/images', { method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body: file }) as Promise<{ url: string }>,
   snapshot: () => request('/api/snapshot') as Promise<Snapshot>,
   createTitle: (body: TitleDraft) => request('/api/titles', { method: 'POST', body: JSON.stringify(body) }),
   updateTitle: (id: number, body: TitleDraft) => request(`/api/titles/${id}`, { method: 'PUT', body: JSON.stringify(body) }),

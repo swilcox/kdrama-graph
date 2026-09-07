@@ -54,6 +54,13 @@ test('previews saved HTML without requesting AsianWiki', async (t) => {
   assert.equal(fetchMock.mock.callCount(), 0)
 })
 
+test('preserves local image paths from complete browser saves for companion-file matching', async () => {
+  const saved = fixture.replace('/images/poster.jpg', './Test_Drama_files/poster.jpg').replace('/images/actor.jpg', './Test_Drama_files/Actor%20One.jpg')
+  const preview = await previewAsianWiki('https://asianwiki.com/Test_Drama', saved)
+  assert.equal(preview.posterUrl, './Test_Drama_files/poster.jpg')
+  assert.equal(preview.cast[0].photoUrl, './Test_Drama_files/Actor%20One.jpg')
+})
+
 test('parses absolute actor links in browser-saved HTML', () => {
   const saved = fixture.replaceAll('href="/Actor_', 'href="https://asianwiki.com/Actor_')
   assert.deepEqual(parseAsianWikiHtml(saved, 'https://asianwiki.com/Test_Drama'), parseAsianWikiHtml(fixture, 'https://asianwiki.com/Test_Drama'))

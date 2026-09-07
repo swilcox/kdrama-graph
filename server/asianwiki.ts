@@ -24,7 +24,7 @@ export async function previewAsianWiki(inputUrl: string, savedHtml?: string): Pr
   const sourceUrl = normalizeAsianWikiUrl(inputUrl)
   if (savedHtml !== undefined) {
     if (Buffer.byteLength(savedHtml, 'utf8') > 2 * 1024 * 1024) throw new Error('Choose an HTML file smaller than 2 MB')
-    return parseAsianWikiHtml(savedHtml, sourceUrl)
+    return parseAsianWikiHtml(savedHtml, sourceUrl, true)
   }
   const pageName = decodeURIComponent(new URL(sourceUrl).pathname.slice(1))
   const printableUrl = `${BASE}/index.php?title=${encodeURIComponent(pageName)}&printable=yes`
@@ -49,7 +49,8 @@ export function normalizeAsianWikiUrl(input: string) {
   return new URL(`/${pageName}`, BASE).toString()
 }
 
-export function parseAsianWikiHtml(html: string, sourceUrl: string): AsianWikiPreview {
+export function parseAsianWikiHtml(html: string, sourceUrl: string, savedPage = false): AsianWikiPreview {
+  const imageUrl = (path: string) => savedPage && path && !/^(https?:|data:|\/)/i.test(path) ? path : absolute(path)
   const $ = cheerio.load(html)
   if ($('#cf-error-details, #challenge-form').length || /Attention Required!|Just a moment/i.test($('title').text())) {
     throw new Error('This is an AsianWiki protection page. Open the title in your browser until its cast is visible, save it as HTML, and use “Preview saved HTML” below.')
@@ -108,7 +109,7 @@ export function parseAsianWikiHtml(html: string, sourceUrl: string): AsianWikiPr
       cast.push({
         name: personName,
         asianwikiUrl: absolute(href),
-        photoUrl: absolute(photo),
+        photoUrl: imageUrl(photo),
         characterName,
         role: section === 'Lead' && index < 4 ? 'Lead' : section,
         billingOrder: cast.length,
@@ -137,7 +138,7 @@ export function parseAsianWikiHtml(html: string, sourceUrl: string): AsianWikiPr
   if (!cast.length) throw new Error('No cast table was found on this AsianWiki page')
   return {
     sourceUrl, name, type, year: yearMatch ? Number(yearMatch[0]) : null,
-    episodesTotal, posterUrl: absolute(posterSrc), cast,
+    episodesTotal, posterUrl: imageUrl(posterSrc), cast,
   }
 }
 

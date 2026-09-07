@@ -4,9 +4,10 @@ import { resolve } from 'node:path'
 import { z } from 'zod'
 import {
   closeDatabase, createPerson, createTitle, createTitleLink, databaseHealth, deleteCredit, deleteTitle, deleteTitleLink,
-  getSnapshot, importAsianWiki, setCredit, updatePerson, updateTitle,
+  getImage, getSnapshot, importAsianWiki, setCredit, storeImage, updatePerson, updateTitle,
 } from './db.js'
 import { previewAsianWiki } from './asianwiki.js'
+import { imageContentType } from './images.js'
 
 const app = express()
 const port = Number(process.env.PORT || 8787)
@@ -47,6 +48,18 @@ app.get('/api/health', (_req, res) => {
   }
 })
 app.get('/api/snapshot', (_req, res) => res.json(getSnapshot()))
+app.post('/api/images', express.raw({ type: 'application/octet-stream', limit: '5mb' }), (req, res) => {
+  const data = req.body
+  const contentType = Buffer.isBuffer(data) ? imageContentType(data) : null
+  if (!contentType) return res.status(400).json({ error: 'Choose a JPEG, PNG, GIF, or WebP image (up to 5 MB each)' })
+  res.json({ url: storeImage(data, contentType) })
+})
+app.get('/api/images/:id', (req, res) => {
+  const image = /^[a-f0-9]{64}$/.test(req.params.id) ? getImage(req.params.id) : undefined
+  if (!image) return res.status(404).end()
+  res.set({ 'Content-Type': image.content_type, 'Cache-Control': 'public, max-age=31536000, immutable', 'X-Content-Type-Options': 'nosniff' })
+  res.send(Buffer.from(image.data))
+})
 app.post('/api/titles', route(titleSchema, (body) => ({ id: createTitle(body) })))
 app.put('/api/titles/:id', route(titleSchema, (body, req) => {
   updateTitle(Number(req.params.id), body)
@@ -101,6 +114,9 @@ if (existsSync(dist)) {
 }
 
 app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  if (error && typeof error === 'object' && 'type' in error && error.type === 'entity.too.large') {
+    return res.status(413).json({ error: 'The selected file is too large. HTML is limited to 2 MB and each image to 5 MB.' })
+  }
   console.error(error)
   res.status(500).json({ error: error instanceof Error ? error.message : 'Unexpected error' })
 })
