@@ -1,4 +1,5 @@
 import { DatabaseSync } from 'node:sqlite'
+import { createHash } from 'node:crypto'
 import { mkdirSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 
@@ -30,6 +31,11 @@ export const db = new DatabaseSync(dbPath)
 db.exec('PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL;')
 
 db.exec(`
+  CREATE TABLE IF NOT EXISTS images (
+    id TEXT PRIMARY KEY,
+    content_type TEXT NOT NULL,
+    data BLOB NOT NULL
+  );
   CREATE TABLE IF NOT EXISTS titles (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
@@ -272,6 +278,16 @@ export function databaseHealth() {
 export function closeDatabase() {
   db.exec('PRAGMA wal_checkpoint(TRUNCATE)')
   db.close()
+}
+
+export function storeImage(data: Buffer, contentType: string) {
+  const id = createHash('sha256').update(data).digest('hex')
+  db.prepare('INSERT OR IGNORE INTO images (id, content_type, data) VALUES (?, ?, ?)').run(id, contentType, data)
+  return `/api/images/${id}`
+}
+
+export function getImage(id: string) {
+  return db.prepare('SELECT content_type, data FROM images WHERE id = ?').get(id) as { content_type: string; data: Uint8Array } | undefined
 }
 
 export function importAsianWiki(preview: {

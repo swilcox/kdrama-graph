@@ -97,7 +97,7 @@ export function TitleForm({ title, titles, people, credits, tags, titleLinks, on
             <datalist id="title-tag-suggestions">{tags.filter((tag) => !draft.tags.includes(tag)).map((tag) => <option key={tag} value={tag} />)}</datalist>
             {!!draft.tags.length && <div className="tag-list">{draft.tags.map((tag) => <span key={tag}><Tag />{tag}<button type="button" onClick={() => field('tags', draft.tags.filter((item) => item !== tag))} aria-label={`Remove ${tag}`}><X /></button></span>)}</div>}
           </div>
-          <div className="field"><label>Poster image URL</label><input type="url" value={draft.posterUrl} onChange={(e) => field('posterUrl', e.target.value)} placeholder="https://..." /></div>
+          <div className="field"><label>Poster image URL</label><input type={draft.posterUrl.startsWith('/api/images/') ? 'text' : 'url'} value={draft.posterUrl} onChange={(e) => field('posterUrl', e.target.value)} placeholder="https://..." /></div>
           <div className="field"><label>AsianWiki URL</label><div className="input-action"><input type="url" value={draft.asianwikiUrl} onChange={(e) => field('asianwikiUrl', e.target.value)} placeholder="https://asianwiki.com/..." />{draft.asianwikiUrl && <a href={draft.asianwikiUrl} target="_blank" rel="noreferrer" aria-label="Open AsianWiki"><ExternalLink /></a>}</div></div>
           <div className="field"><label>Notes & review</label><textarea rows={5} value={draft.notes} onChange={(e) => field('notes', e.target.value)} placeholder="What worked, favorite moments, whether you'd rewatch..." /></div>
 

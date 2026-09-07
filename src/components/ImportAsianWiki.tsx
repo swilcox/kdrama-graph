@@ -1,34 +1,59 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Check, Download, ExternalLink, LoaderCircle, X } from 'lucide-react'
 import { api } from '../api'
 import type { AsianWikiPreview, WatchStatus } from '../types'
 import { Artwork } from './Artwork'
+import { resolveSavedImages } from '../saved-images'
 
 export function ImportAsianWiki({ onClose, onImported }: { onClose: () => void; onImported: (titleId: number) => Promise<void> }) {
   const [url, setUrl] = useState('')
   const [savedFile, setSavedFile] = useState<File | null>(null)
+  const [savedImages, setSavedImages] = useState<File[]>([])
+  const [localImages, setLocalImages] = useState(new Map<string, File>())
+  const [missingImages, setMissingImages] = useState(0)
   const [preview, setPreview] = useState<AsianWikiPreview | null>(null)
   const [status, setStatus] = useState<WatchStatus>('watchlist')
   const [castLimit, setCastLimit] = useState(500)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [result, setResult] = useState<{ created: boolean; peopleCreated: number; creditsCreated: number } | null>(null)
+  useEffect(() => () => { for (const url of localImages.keys()) URL.revokeObjectURL(url) }, [localImages])
 
   const loadPreview = async (file?: File) => {
-    setBusy(true); setError(''); setResult(null); setPreview(null)
+    setBusy(true); setError(''); setResult(null); setPreview(null); setMissingImages(0)
+    const images = new Map<string, File>()
     try {
       if (file && file.size > 2 * 1024 * 1024) throw new Error('Choose an HTML file smaller than 2 MB')
       const data = await api.previewAsianWiki(url, file ? await file.text() : undefined)
-      setPreview(data)
+      const resolved = resolveSavedImages(data, file ? savedImages : [], (image) => {
+        for (const [url, existing] of images) if (existing === image) return url
+        const url = URL.createObjectURL(image)
+        images.set(url, image)
+        return url
+      })
+      setPreview(resolved.preview)
+      setMissingImages(resolved.missing)
       setCastLimit(data.cast.length)
     } catch (err) { setError(message(err)) }
-    finally { setBusy(false) }
+    finally { setLocalImages(images); setBusy(false) }
   }
   const runImport = async () => {
     if (!preview) return
     setBusy(true); setError('')
     try {
-      const imported = await api.importAsianWiki(preview, status, castLimit)
+      const uploaded = new Map<string, string>()
+      const sources = [preview.posterUrl, ...preview.cast.slice(0, castLimit).map((person) => person.photoUrl)]
+      for (const source of new Set(sources)) {
+        const file = localImages.get(source)
+        if (!file) continue
+        if (file.size > 5 * 1024 * 1024) throw new Error(`${file.name} is larger than the 5 MB image limit`)
+        uploaded.set(source, (await api.uploadImage(file)).url)
+      }
+      const importedPreview = {
+        ...preview, posterUrl: uploaded.get(preview.posterUrl) ?? preview.posterUrl,
+        cast: preview.cast.slice(0, castLimit).map((person) => ({ ...person, photoUrl: uploaded.get(person.photoUrl) ?? person.photoUrl })),
+      }
+      const imported = await api.importAsianWiki(importedPreview, status, castLimit)
       setResult(imported)
       await onImported(imported.titleId)
     } catch (err) { setError(message(err)) }
@@ -45,12 +70,15 @@ export function ImportAsianWiki({ onClose, onImported }: { onClose: () => void; 
         {error && <div className="inline-error">{error}</div>}
         <details className="import-saved">
           <summary>Blocked? Import a saved page</summary>
-          <p>Open the title on AsianWiki and wait for the cast to appear. Use your browser’s Save Page As command and choose HTML only. Enter the same title URL above, then select the saved .html file here (up to 2 MB).</p>
+          <p>Save the loaded AsianWiki title as a complete webpage to include images. Enter the same title URL above, select the .html file (up to 2 MB), and choose its companion folder below. HTML-only pages also work.</p>
           <form onSubmit={(event) => { event.preventDefault(); if (savedFile) loadPreview(savedFile) }}>
             <div className="field"><label htmlFor="asianwiki-html">Saved AsianWiki page</label><input id="asianwiki-html" type="file" accept=".html,.htm,text/html" required disabled={busy} onChange={(event) => { setSavedFile(event.target.files?.[0] ?? null); setPreview(null); setResult(null); setError('') }} /></div>
+            <div className="field"><label htmlFor="asianwiki-images">Downloaded image folder (optional)</label><input id="asianwiki-images" type="file" {...{ webkitdirectory: '' }} multiple disabled={busy} onChange={(event) => { setSavedImages(Array.from(event.target.files ?? [])); setPreview(null); setResult(null); setError(''); setMissingImages(0) }} /><small>Choose the folder saved beside the HTML, often ending in “_files”. Only matching poster and cast images are imported. JPEG, PNG, GIF, and WebP are supported, up to 5 MB each.</small></div>
             <button className="button secondary" disabled={busy || !savedFile || !url.trim()}><Download />Preview saved HTML</button>
           </form>
         </details>
+        {preview && missingImages > 0 && <div className="inline-error">{missingImages} downloaded {missingImages === 1 ? 'image was' : 'images were'} not found. Select the companion image folder and preview again to include them.</div>}
+        {preview && localImages.size > 0 && <p className="import-image-count">{localImages.size} downloaded {localImages.size === 1 ? 'image' : 'images'} matched. Images for the selected cast and poster will be saved with your library when you import.</p>}
         {!preview && !busy && <div className="import-empty"><Download /><h3>Paste one title page</h3><p>Scene Map will collect its poster, year, episode count, cast profiles, character names, and source links.</p></div>}
         {busy && !preview && <div className="import-empty"><LoaderCircle className="spin" /><h3>Reading AsianWiki...</h3><p>Large cast pages can take a few seconds.</p></div>}
         {preview && <>

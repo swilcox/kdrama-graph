@@ -40,6 +40,33 @@ test('saved-page previews accept HTML over 1 MB and feed the existing import flo
     const result = await imported.json() as { peopleCreated: number }
     assert.equal(result.peopleCreated, 1)
 
+    const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=', 'base64')
+    const upload = () => fetch(`${base}/api/images`, { method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body: png })
+    const imageResponse = await upload()
+    assert.equal(imageResponse.status, 200)
+    const image = await imageResponse.json() as { url: string }
+    assert.match(image.url, /^\/api\/images\/[a-f0-9]{64}$/)
+    assert.deepEqual(await (await upload()).json(), image)
+    const imagePreview = { ...preview, posterUrl: image.url, cast: preview.cast.map((person) => ({ ...person, photoUrl: image.url })) }
+    const repaired = await post('/api/import/asianwiki', { preview: imagePreview, status: 'completed', castLimit: 1 })
+    assert.equal(repaired.status, 200)
+    assert.equal((await repaired.json() as { created: boolean }).created, false)
+    const { getSnapshot, getImage } = await import('./db.js')
+    const title = getSnapshot().titles.find((item) => item.name === 'Saved Drama')
+    assert.equal(title?.posterUrl, image.url)
+    assert.equal(title?.status, 'watchlist')
+    assert.equal(getSnapshot().people.find((person) => person.name === 'Saved Actor')?.photoUrl, image.url)
+    assert.deepEqual(Buffer.from(getImage(image.url.split('/').at(-1)!)!.data), png)
+    const served = await fetch(`${base}${image.url}`)
+    assert.equal(served.headers.get('content-type'), 'image/png')
+    assert.equal(served.headers.get('x-content-type-options'), 'nosniff')
+    assert.deepEqual(Buffer.from(await served.arrayBuffer()), png)
+    assert.equal((await fetch(`${base}/api/images/${'0'.repeat(64)}`)).status, 404)
+    const script = await fetch(`${base}/api/images`, { method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body: '<script>alert(1)</script>' })
+    assert.equal(script.status, 400)
+    const largeImage = await fetch(`${base}/api/images`, { method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body: Buffer.alloc(5 * 1024 * 1024 + 1) })
+    assert.equal(largeImage.status, 413)
+
     const invalid = await post('/api/import/asianwiki/preview', { url: 'https://asianwiki.com/Saved_Drama', html: 42 })
     assert.equal(invalid.status, 400)
     const oversized = await post('/api/import/asianwiki/preview', { url: 'https://asianwiki.com/Saved_Drama', html: 'x'.repeat(2 * 1024 * 1024 + 1) })

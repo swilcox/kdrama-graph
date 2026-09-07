@@ -6,7 +6,9 @@ A local-first K-drama and Korean film journal. Track watch status, episode progr
 
 Paste an AsianWiki title URL into **Import** to preview and import its metadata and cast. Imports are explicit, rate-friendly single-page requests; the app does not crawl AsianWiki in the background. Existing titles and people are reused when possible.
 
-If AsianWiki blocks the automatic request with HTTP 403 but opens in your browser, save the loaded title page using **Save Page As → HTML only**. In Import, enter the same AsianWiki URL, expand **Blocked? Import a saved page**, choose the `.html` file (up to 2 MB), and click **Preview saved HTML**. Review and import the cast as usual. Saved HTML is parsed locally by the Scene Map server; its scripts are not executed. Use HTML only so image links still point to AsianWiki instead of a local companion folder.
+If AsianWiki blocks the automatic request with HTTP 403 but opens in your browser, save the loaded title page using **Save Page As → Webpage, Complete**. In Import, enter the same AsianWiki URL, expand **Blocked? Import a saved page**, choose the `.html` file (up to 2 MB) and its companion image folder (often ending in `_files`), then click **Preview saved HTML**. Review and import the cast as usual. HTML-only saves also work, but their images still depend on AsianWiki being accessible.
+
+Downloaded poster and cast images are matched to the HTML's saved paths. Only referenced images for the chosen cast and poster are uploaded when you import; scripts and unrelated folder files are not uploaded. JPEG, PNG, GIF, and WebP images up to 5 MB each are supported. Images are deduplicated and stored in SQLite, so they survive container upgrades and are included in the existing database backup/restore workflow. To repair an earlier import's missing images, preview again with its image folder and re-import the same title; existing titles and people are updated. Saved HTML is parsed by the Scene Map server without executing its scripts.
 
 ## Run locally
 
